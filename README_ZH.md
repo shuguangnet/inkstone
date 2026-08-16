@@ -17,7 +17,7 @@
 
 ## 项目简介
 
-Inkstone 是运行在 Cloudflare Workers 上的浏览器笔记本。笔记始终是普通 Markdown 文本；在此基础上，应用提供专注写作、实时预览、关键词与可选语义搜索、双链导航、离线编辑、多设备同步、私有 AI 接入、公开分享和异地备份。
+Inkstone 是一套可运行在 Cloudflare Workers 上，也可通过 Docker 私有化部署到自有 VPS 的浏览器笔记本。笔记始终是普通 Markdown 文本；在此基础上，应用提供专注写作、实时预览、关键词与可选语义搜索、双链导航、离线编辑、多设备同步、私有 AI 接入、公开分享和异地备份。
 
 它是一套需要自行部署的完整应用，数据库、附件和运行环境都由部署者掌控。
 
@@ -38,20 +38,38 @@ Inkstone 是运行在 Cloudflare Workers 上的浏览器笔记本。笔记始终
 | 可迁移性 | JSON 与 ZIP 导出、可直接阅读的 **Markdown**、附件导出、**手动或定时 WebDAV/S3 备份** |
 | 界面 | **桌面与移动布局**、**深浅主题**、强调色、简体中文和英文，以及仅站长可见的版本更新提醒 |
 
+## 私有化部署方式
+
+两种部署方式都属于自托管，应用数据均由部署者控制。
+
+| | Cloudflare 部署 | Docker VPS 私有化部署 |
+| --- | --- | --- |
+| 运行环境 | Cloudflare Workers | Docker Compose 中的本地 workerd 运行时 |
+| 持久化数据 | 托管 D1、R2 或 KV、Durable Objects | 本地 D1、KV 和 Durable Object 状态，统一保存在 Docker 卷中 |
+| 访问方式 | Workers 域名或自定义域名 | 自有 HTTPS 反向代理和域名 |
+| 搜索能力 | FTS5 关键词搜索，可选 Workers AI 语义搜索 | FTS5 关键词搜索，不支持 Workers AI |
+| 运维责任 | Cloudflare 管理运行时和存储服务 | 自行管理 VPS、升级、卷备份、TLS 和监控 |
+| 扩容方式 | Cloudflare 托管平台 | 单节点、单应用副本 |
+
+Docker 模式不需要 Cloudflare 账号，也不依赖 Cloudflare 托管存储。它可以部署在公网 VPS、私有网络或家庭服务器中，但客户端必须通过固定的 HTTPS 地址访问。
+
 ## 数据存放位置
 
-| 组件 | 用途 |
-| --- | --- |
-| Cloudflare D1 | 账号、笔记、文件夹、标签、设置、版本、分享、关键词索引、按账号隔离的 AI 向量和后台索引队列 |
-| Cloudflare R2 或 Workers KV | 通过 `FILES` 或 `FILES_KV` 绑定存放附件及上传头像的二进制 |
-| Workers KV `OAUTH_KV` | OAuth 客户端注册、授权码、访问令牌、刷新令牌和授权记录；不存放笔记正文 |
-| Workers AI `AI` 绑定 | 可选生成语义搜索向量；未配置时继续使用关键词搜索 |
-| 浏览器 IndexedDB | 本地缓存与尚未上传的离线写入 |
-| `SyncHub` Durable Object | 在线客户端之间的实时变更通知 |
-| `CredentialVault` Durable Object | 隔离保存用于加密备份凭据的密钥 |
-| WebDAV 或 S3 存储 | 用户自行配置的异地备份 |
+| 数据 | Cloudflare 部署 | Docker VPS 部署 |
+| --- | --- | --- |
+| 账号、笔记、文件夹、标签、设置、版本、分享和 FTS 索引 | Cloudflare D1 | 持久化 `inkstone_data` 卷中的本地 D1 状态 |
+| 附件和上传头像 | Cloudflare R2 或 Workers KV | 持久化卷中的本地 KV 状态 |
+| MCP OAuth 注册、令牌和授权记录 | Workers KV `OAUTH_KV` | 持久化卷中的本地 KV 状态 |
+| 实时同步与备份密钥加密存储 | `SyncHub` 和 `CredentialVault` Durable Objects | 持久化卷中的本地 Durable Object 状态 |
+| 语义搜索向量 | 可选 Workers AI 绑定 | 不支持；关键词搜索仍可正常使用 |
+| 离线缓存与待上传写入 | 浏览器 IndexedDB | 浏览器 IndexedDB |
+| 异地备份 | 用户配置的 WebDAV 或 S3 兼容存储 | 用户配置的 WebDAV 或 S3 兼容存储 |
 
 ## 部署教程
+
+可选择 Cloudflare 或 Docker VPS 方式。两种模式都会通过带版本号、可重复安全执行的迁移自动升级现有数据库，更新前应保留一份最新备份。
+
+### Cloudflare 部署
 
 1. Fork Inkstone 仓库到自己的 GitHub 账号
 2. 进入 [Cloudflare Workers & Pages](https://dash.cloudflare.com/?to=/:account/workers-and-pages/create)
@@ -60,11 +78,36 @@ Inkstone 是运行在 Cloudflare Workers 上的浏览器笔记本。笔记始终
    - 如果你打算用 KV 模式，把部署命令改成 `npm run deploy:kv`
 5. 等部署完成后，打开生成的 Workers 域名
 
-现有数据库会通过带版本号、可重复安全执行的迁移自动升级。自托管实例更新前仍建议保留一份最新备份；发现新的稳定版本时，只有站长会收到专门的更新提醒，不会打扰普通成员。
+发现新的稳定版本时，只有站长会收到专门的更新提醒，不会打扰普通成员。
 
-### 使用 Docker 部署到 VPS
+### Docker VPS 私有化部署
 
-Inkstone 也可以作为单机 Docker 服务运行，D1、KV 和 Durable Object 数据保存在本地持久化卷中。该模式要求使用 HTTPS 反向代理，并且不包含 Workers AI 语义搜索。
+环境要求：
+
+- 安装了 Docker Engine 和 Docker Compose 的 Linux VPS 或服务器
+- 建议至少 2 核 CPU、2 GB 内存和 5 GB 可用磁盘
+- 一个域名或私有 DNS 名称，并通过 Caddy、Nginx、Traefik 等反向代理提供 HTTPS
+
+快速启动：
+
+```bash
+git clone https://github.com/shuguangnet/inkstone.git
+cd inkstone
+cp .env.example .env
+sed -i "s/^INKSTONE_SCHEDULE_TOKEN=.*/INKSTONE_SCHEDULE_TOKEN=$(openssl rand -hex 32)/" .env
+```
+
+将 `.env` 中的 `INKSTONE_PUBLIC_URL` 设置为浏览器实际使用的 HTTPS 地址，然后启动服务：
+
+```bash
+docker compose up -d --build
+docker compose ps
+curl http://127.0.0.1:7712/api/health
+```
+
+Compose 会启动应用服务、定时维护任务和只监听回环地址的内部网关。内部计划任务端点不会暴露到公网，应用容器会移除全部 Linux capabilities，网关使用只读文件系统；替换或升级容器后，全部应用状态仍保存在命名 Docker 卷中。
+
+Docker VPS 模式支持账号、笔记、文件夹、标签、附件、公开分享、MCP、实时同步、离线编辑、ZIP/JSON 导出和定时 WebDAV/S3 备份。该模式不提供 Workers AI 语义搜索、Cloudflare 分布式可用性和水平扩容能力，只能运行一个应用副本，并应将 `inkstone_data` 卷纳入 VPS 备份策略。
 
 Compose 部署、升级、备份和安全说明见 [VPS_DOCKER_ZH.md](./VPS_DOCKER_ZH.md)。
 
@@ -89,6 +132,8 @@ Compose 部署、升级、备份和安全说明见 [VPS_DOCKER_ZH.md](./VPS_DOCK
 | `npm run i18n:check` | 检查中英文资源键是否完整一致 |
 | `npm run comments:check` | 检查源码注释规范 |
 | `npm run build` | 类型检查并生成生产构建 |
+| `npm run build:vps` | 类型检查并生成本地 workerd 生产构建 |
+| `npm run start:vps` | 使用本地持久化状态运行已经构建的 VPS 服务 |
 | `npm run deploy:kv` | 使用 `wrangler.kv.toml` 构建并部署 |
 | `npm run deploy:demo` | 构建并部署纯静态体验版 |
 | `npm run test:e2e` | 对正在运行的临时本地实例执行 API 端到端测试 |

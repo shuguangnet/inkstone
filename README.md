@@ -17,7 +17,7 @@
 
 ## About
 
-Inkstone is a browser-based notebook that runs on Cloudflare Workers. Notes always remain plain Markdown text; on top of that foundation, the application provides focused writing, live preview, lexical and optional semantic search, bidirectional links, offline editing, multi-device synchronization, private AI access, public sharing, and off-site backups.
+Inkstone is a browser-based notebook that can run on Cloudflare Workers or as a private Docker service on your own VPS. Notes always remain plain Markdown text; on top of that foundation, the application provides focused writing, live preview, lexical and optional semantic search, bidirectional links, offline editing, multi-device synchronization, private AI access, public sharing, and off-site backups.
 
 It is a complete self-hosted application. The deployer retains control of the database, attachments, and runtime environment.
 
@@ -37,20 +37,38 @@ Every new account automatically receives two standard starter notes, one in Chin
 | Portability | JSON and ZIP exports, directly readable **Markdown**, attachment export, and **manual or scheduled WebDAV/S3 backups** |
 | Interface | **Desktop and mobile layouts**, **dark/light themes**, accent colors, Simplified Chinese, English, and owner-only update notifications |
 
+## Self-hosting options
+
+Both deployment modes are self-hosted and keep the application data under the deployer's control.
+
+| | Cloudflare | Docker VPS |
+| --- | --- | --- |
+| Runtime | Cloudflare Workers | Local workerd runtime in Docker Compose |
+| Persistent data | Managed D1, R2 or KV, and Durable Objects | Local D1, KV, and Durable Object state in one Docker volume |
+| Public access | Workers URL or a custom domain | Your own HTTPS reverse proxy and domain |
+| Search | FTS5 lexical search and optional Workers AI semantic search | FTS5 lexical search; Workers AI is unavailable |
+| Operations | Cloudflare manages runtime availability and storage services | You manage the VPS, updates, volume backups, TLS, and monitoring |
+| Scaling | Cloudflare-managed platform | One application replica on a single node |
+
+The Docker mode does not require a Cloudflare account or Cloudflare-managed storage. It is suitable for a public VPS, a private network, or a homelab, as long as clients access it through a stable HTTPS origin.
+
 ## Data storage
 
-| Component | Purpose |
-| --- | --- |
-| Cloudflare D1 | Accounts, notes, folders, tags, settings, versions, shares, lexical indexes, per-account AI embeddings, and background indexing queues |
-| Cloudflare R2 or Workers KV | Attachment and uploaded-avatar binaries through the `FILES` or `FILES_KV` binding |
-| Workers KV `OAUTH_KV` | OAuth client registrations, authorization codes, access and refresh tokens, and grants; note bodies are not stored here |
-| Workers AI `AI` binding | Optional embedding generation for semantic search; unavailable deployments continue to use lexical search |
-| Browser IndexedDB | Local cache and pending offline writes |
-| `SyncHub` Durable Object | Realtime change notifications between active clients |
-| `CredentialVault` Durable Object | Isolated storage for the key used to encrypt backup credentials |
-| WebDAV or S3 storage | User-configured off-site backups |
+| Data | Cloudflare deployment | Docker VPS deployment |
+| --- | --- | --- |
+| Accounts, notes, folders, tags, settings, versions, shares, and FTS indexes | Cloudflare D1 | Local D1 state in the persistent `inkstone_data` volume |
+| Attachments and uploaded avatars | Cloudflare R2 or Workers KV | Local KV state in the persistent volume |
+| MCP OAuth registrations, tokens, and grants | Workers KV `OAUTH_KV` | Local KV state in the persistent volume |
+| Realtime synchronization and encrypted backup-key storage | `SyncHub` and `CredentialVault` Durable Objects | Local Durable Object state in the persistent volume |
+| Semantic-search embeddings | Optional Workers AI binding | Not available; lexical search continues to work |
+| Offline cache and pending writes | Browser IndexedDB | Browser IndexedDB |
+| Off-site backups | User-configured WebDAV or S3-compatible storage | User-configured WebDAV or S3-compatible storage |
 
 ## Deployment
+
+Choose either Cloudflare or Docker VPS. Existing databases are upgraded automatically through versioned, idempotent migrations in both modes. Keep a current backup before updating any deployment.
+
+### Cloudflare
 
 1. Fork the Inkstone repository to your GitHub account.
 2. Open [Cloudflare Workers & Pages](https://dash.cloudflare.com/?to=/:account/workers-and-pages/create).
@@ -59,11 +77,36 @@ Every new account automatically receives two standard starter notes, one in Chin
    - To use KV mode, change the deploy command to `npm run deploy:kv`.
 5. After deployment completes, open the generated Workers URL.
 
-Existing databases are upgraded automatically through versioned, idempotent migrations. Keep a current backup before updating any self-hosted deployment. When a newer stable Inkstone release is available, the owner receives a focused reminder without interrupting regular members.
+When a newer stable Inkstone release is available, the owner receives a focused reminder without interrupting regular members.
 
-### Docker on a VPS
+### Private Docker VPS
 
-Inkstone can also run as a single-node Docker deployment with local D1, KV, and Durable Object storage. This mode requires an HTTPS reverse proxy and a persistent Docker volume, and does not include Workers AI semantic search.
+Requirements:
+
+- Linux VPS or server with Docker Engine and Docker Compose
+- Recommended minimum of 2 CPU cores, 2 GB RAM, and 5 GB free disk space
+- A domain or private DNS name with HTTPS termination through Caddy, Nginx, Traefik, or another reverse proxy
+
+Quick start:
+
+```bash
+git clone https://github.com/shuguangnet/inkstone.git
+cd inkstone
+cp .env.example .env
+sed -i "s/^INKSTONE_SCHEDULE_TOKEN=.*/INKSTONE_SCHEDULE_TOKEN=$(openssl rand -hex 32)/" .env
+```
+
+Set `INKSTONE_PUBLIC_URL` in `.env` to the exact HTTPS origin used in the browser, then start the stack:
+
+```bash
+docker compose up -d --build
+docker compose ps
+curl http://127.0.0.1:7712/api/health
+```
+
+The Compose stack runs the application, its scheduled maintenance jobs, and a loopback-only gateway. The internal scheduler endpoint is not exposed publicly, the application containers drop all Linux capabilities, the gateway uses a read-only filesystem, and all application state survives container replacement in the named Docker volume.
+
+Docker VPS mode supports accounts, notes, folders, tags, attachments, sharing, MCP, realtime synchronization, offline editing, ZIP/JSON export, and scheduled WebDAV/S3 backups. It does not provide Workers AI semantic search, Cloudflare's distributed availability, or horizontal scaling. Run only one application replica and include the `inkstone_data` volume in the VPS backup policy.
 
 See [VPS_DOCKER.md](./VPS_DOCKER.md) for the Compose deployment, upgrade, backup, and security instructions.
 
@@ -88,6 +131,8 @@ See [VPS_DOCKER.md](./VPS_DOCKER.md) for the Compose deployment, upgrade, backup
 | `npm run i18n:check` | Verify parity between the English and Chinese locale resources |
 | `npm run comments:check` | Enforce the source-comment policy |
 | `npm run build` | Type-check and create a production build |
+| `npm run build:vps` | Type-check and create the local workerd production build |
+| `npm run start:vps` | Run a built VPS bundle with persistent local state |
 | `npm run deploy:kv` | Build and deploy with `wrangler.kv.toml` |
 | `npm run deploy:demo` | Build and deploy the static browser-only demo |
 | `npm run test:e2e` | Exercise the API against a running disposable local instance |
