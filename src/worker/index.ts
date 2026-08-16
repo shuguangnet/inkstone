@@ -8,6 +8,7 @@ import { createOAuthProvider, providerForScheduled } from './mcp/oauth'
 import { purgeRevokedMcpApiKeys } from './mcp/api-keys'
 import { purgeExpiredMcpOperations } from './mcp/operations'
 import { purgeExpiredOperationalData } from './lib/maintenance'
+import { normalizePublicRequest } from './lib/public-url'
 
 export { SyncHub } from './realtime/sync-hub'
 export { CredentialVault } from './durable/credential-vault'
@@ -19,10 +20,14 @@ export { CredentialVault } from './durable/credential-vault'
 // without that flag to keep codex compatible; the standard RFC 9207 `iss`
 // parameter is still appended to callbacks for conforming clients.
 const OAUTH_AUTHORIZATION_SERVER_METADATA = '/.well-known/oauth-authorization-server'
+const INTERNAL_SCHEDULE_PATH = '/_internal/scheduled'
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const oauthRequest = await normalizeRepeatedOAuthResource(request)
+    if (new URL(request.url).pathname === INTERNAL_SCHEDULE_PATH) {
+      return handleInternalScheduledRequest(request, env)
+    }
+    const oauthRequest = await normalizeRepeatedOAuthResource(normalizePublicRequest(request, env.PUBLIC_URL))
     const provider = createOAuthProvider(oauthRequest, env)
     if (new URL(oauthRequest.url).pathname === OAUTH_AUTHORIZATION_SERVER_METADATA) {
       return oauthMetadataWithoutIssParameter(provider, oauthRequest, env, ctx)
@@ -31,21 +36,32 @@ export default {
   },
 
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil((async () => {
-      await initializeDatabase(env)
-      await Promise.all([
-        runScheduledBackups(env),
-        runAttachmentCleanup(env),
-        purgeExpiredMcpOperations(env.DB),
-        purgeExpiredOperationalData(env.DB),
-        purgeRevokedMcpApiKeys(env.DB),
-        providerForScheduled(env).purgeExpiredData(env, { batchSize: 100 }),
-        drainAiIndexQueue(env, 300),
-        drainAllFtsQueues(env.DB),
-      ])
-    })())
+    ctx.waitUntil(runScheduledTasks(env))
   },
 } satisfies ExportedHandler<Env>
+
+async function handleInternalScheduledRequest(request: Request, env: Env): Promise<Response> {
+  if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 })
+  const expected = env.SCHEDULE_TOKEN
+  const presented = request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '')
+  if (!expected || !presented || presented !== expected) return new Response('Not Found', { status: 404 })
+  await runScheduledTasks(env)
+  return Response.json({ ok: true })
+}
+
+async function runScheduledTasks(env: Env): Promise<void> {
+  await initializeDatabase(env)
+  await Promise.all([
+    runScheduledBackups(env),
+    runAttachmentCleanup(env),
+    purgeExpiredMcpOperations(env.DB),
+    purgeExpiredOperationalData(env.DB),
+    purgeRevokedMcpApiKeys(env.DB),
+    providerForScheduled(env).purgeExpiredData(env, { batchSize: 100 }),
+    drainAiIndexQueue(env, 300),
+    drainAllFtsQueues(env.DB),
+  ])
+}
 
 async function normalizeRepeatedOAuthResource(request: Request): Promise<Request> {
   const url = new URL(request.url)

@@ -61,6 +61,12 @@ Every new account automatically receives two standard starter notes, one in Chin
 
 Existing databases are upgraded automatically through versioned, idempotent migrations. Keep a current backup before updating any self-hosted deployment. When a newer stable Inkstone release is available, the owner receives a focused reminder without interrupting regular members.
 
+### Docker on a VPS
+
+Inkstone can also run as a single-node Docker deployment with local D1, KV, and Durable Object storage. This mode requires an HTTPS reverse proxy and a persistent Docker volume, and does not include Workers AI semantic search.
+
+See [VPS_DOCKER.md](./VPS_DOCKER.md) for the Compose deployment, upgrade, backup, and security instructions.
+
 ## Exports and backups
 
 - JSON export preserves legacy structured notebook data for re-import.

@@ -3,6 +3,7 @@ import type { AppBindings } from '../env'
 import { ApiError } from '../lib/errors'
 import { JSON_BODY_LIMITS, readJson } from '../lib/request'
 import { requireAuth } from '../middleware/auth'
+import { configuredPublicOrigin } from '../lib/public-url'
 import {
   clearAiIndex,
   drainAiIndexQueue,
@@ -199,10 +200,5 @@ async function collectGrantIds(
 }
 
 function configuredOrigin(request: Request, configured?: string): string {
-  if (!configured) return new URL(request.url).origin
-  try {
-    return new URL(configured).origin
-  } catch {
-    return new URL(request.url).origin
-  }
+  return configuredPublicOrigin(configured) ?? new URL(request.url).origin
 }

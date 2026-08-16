@@ -1,0 +1,61 @@
+x-inkstone-image: &inkstone-image ${INKSTONE_IMAGE:-inkstone-vps:local}
+
+services:
+  app:
+    image: *inkstone-image
+    build:
+      context: .
+    restart: unless-stopped
+    init: true
+    environment:
+      INKSTONE_PUBLIC_URL: ${INKSTONE_PUBLIC_URL:?Set INKSTONE_PUBLIC_URL in .env}
+      INKSTONE_APP_NAME: ${INKSTONE_APP_NAME:-Inkstone}
+      INKSTONE_LOG_LEVEL: ${INKSTONE_LOG_LEVEL:-info}
+      INKSTONE_SCHEDULE_TOKEN: ${INKSTONE_SCHEDULE_TOKEN:?Generate INKSTONE_SCHEDULE_TOKEN in .env}
+    expose:
+      - "7712"
+    volumes:
+      - inkstone_data:/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  scheduler:
+    image: *inkstone-image
+    pull_policy: never
+    restart: unless-stopped
+    init: true
+    command: ["node", "scripts/vps-scheduler.mjs"]
+    environment:
+      INKSTONE_SCHEDULE_URL: http://app:7712/_internal/scheduled
+      INKSTONE_SCHEDULE_TOKEN: ${INKSTONE_SCHEDULE_TOKEN:?Generate INKSTONE_SCHEDULE_TOKEN in .env}
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  gateway:
+    image: caddy:2.11.4-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${INKSTONE_PORT:-7712}:8080"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+    read_only: true
+    tmpfs:
+      - /config
+      - /data
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  inkstone_data:

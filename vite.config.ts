@@ -7,6 +7,12 @@ import { inkstonePwa } from './pwa.config.ts'
 const r = (p: string) => fileURLToPath(new URL(p, import.meta.url))
 const ephemeralDevState = process.env.INKSTONE_EPHEMERAL_DEV === '1'
 
+const workerConfigPath = (mode: string) => {
+  if (mode === 'kv') return './wrangler.kv.toml'
+  if (mode === 'vps') return './wrangler.vps.toml'
+  return undefined
+}
+
 const normalizeModuleId = (id: string) => id.replace(/\\/g, '/')
 
 
@@ -82,7 +88,7 @@ const config: UserConfigFnPromise = async ({ mode, command }) => ({
       ? []
       : [
           (await import('@cloudflare/vite-plugin')).cloudflare({
-            configPath: mode === 'kv' ? './wrangler.kv.toml' : undefined,
+            configPath: workerConfigPath(mode),
             persistState: !ephemeralDevState,
           }),
         ]),

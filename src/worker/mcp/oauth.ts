@@ -5,6 +5,7 @@ import { createApp } from '../app'
 import { initializeDatabase } from '../db/schema'
 import type { Env } from '../env'
 import { consumeAttemptBudget, ThrottleError } from '../lib/throttle'
+import { configuredPublicOrigin } from '../lib/public-url'
 import { verifyMcpApiKey } from './api-keys'
 import { createInkstoneMcpServer, type McpAuthProps } from './server'
 import { isMcpEnabled, MCP_SUPPORTED_SCOPES } from './settings'
@@ -64,7 +65,7 @@ export function createOAuthProvider(request: Request, env: Env): OAuthProvider<E
 }
 
 export function providerForScheduled(env: Env): OAuthProvider<Env> {
-  const origin = configuredOrigin(env.PUBLIC_URL) ?? 'https://inkstone.invalid'
+  const origin = configuredPublicOrigin(env.PUBLIC_URL) ?? 'https://inkstone.invalid'
   return providerForOrigin(origin, env)
 }
 
@@ -142,20 +143,7 @@ function providerForOrigin(origin: string, env: Env): OAuthProvider<Env> {
 }
 
 function canonicalOrigin(request: Request, value?: string): string {
-  return configuredOrigin(value) ?? new URL(request.url).origin
-}
-
-function configuredOrigin(value?: string): string | null {
-  if (!value) return null
-  try {
-    const url = new URL(value)
-    if (url.protocol !== 'https:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
-      return null
-    }
-    return url.origin
-  } catch {
-    return null
-  }
+  return configuredPublicOrigin(value) ?? new URL(request.url).origin
 }
 
 function isAuthProps(value: unknown): value is McpAuthProps {

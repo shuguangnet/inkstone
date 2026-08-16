@@ -62,6 +62,12 @@ Inkstone 是运行在 Cloudflare Workers 上的浏览器笔记本。笔记始终
 
 现有数据库会通过带版本号、可重复安全执行的迁移自动升级。自托管实例更新前仍建议保留一份最新备份；发现新的稳定版本时，只有站长会收到专门的更新提醒，不会打扰普通成员。
 
+### 使用 Docker 部署到 VPS
+
+Inkstone 也可以作为单机 Docker 服务运行，D1、KV 和 Durable Object 数据保存在本地持久化卷中。该模式要求使用 HTTPS 反向代理，并且不包含 Workers AI 语义搜索。
+
+Compose 部署、升级、备份和安全说明见 [VPS_DOCKER_ZH.md](./VPS_DOCKER_ZH.md)。
+
 ## 导出与备份
 
 - JSON 导出保留可重新导入的旧版结构化笔记数据。
