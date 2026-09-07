@@ -221,6 +221,7 @@ export const ZH_CN_MESSAGES = {
     "common.save": "保存",
     "common.save_failed": "保存失败",
     "common.search_notes_or_run_a_command": "搜索笔记、执行命令",
+    "shell.search": "搜索",
     "common.settings": "设置",
     "common.strikethrough": "删除线",
     "common.tabs": "标签页",
@@ -239,11 +240,9 @@ export const ZH_CN_MESSAGES = {
     "common.zoom_out": "缩小",
     "editor.column_1_column_2_column_3": "| 列 1 | 列 2 | 列 3 |",
     "editor.create_new_note": "创建新笔记",
-    "editor.definition": "定义",
     "editor.start_writing": "开始写点什么…",
     "editor.tab_1": "标签 1",
     "editor.tab_2": "标签 2",
-    "editor.term": "术语",
     "editor.upload_failed_value0": "<!-- 上传失败：{value0} -->",
     "editor.uploading_value0": "![上传中 {value0}…]()",
     "feedback.dismiss": "关闭提示",
@@ -295,6 +294,7 @@ export const ZH_CN_MESSAGES = {
     "graph.reset": "复位",
     "markdown.abstract": "摘要",
     "markdown.code": "代码",
+    "markdown.collapse_code": "收起代码",
     "markdown.code_highlighting_timed_out_while_loading": "代码高亮组件加载超时",
     "markdown.copy_code": "复制代码",
     "markdown.could_not_load_embedded_content": "嵌入内容无法加载",
@@ -324,6 +324,7 @@ export const ZH_CN_MESSAGES = {
     "markdown.redrawing_chart": "正在重新绘制图表…",
     "markdown.rendering_diagram": "正在绘制图表…",
     "markdown.success": "成功",
+    "markdown.show_more_code": "显示其余 {count} 行",
     "markdown.tasks_in_embedded_notes_are_read_only": "嵌入笔记中的任务为只读",
     "markdown.the_front_matter_root_must_be_a_yaml_mapping": "Front Matter 顶层必须是 YAML 映射",
     "markdown.the_tasks_in_the_example_are_read_only": "示例中的任务为只读",
@@ -779,6 +780,10 @@ export const ZH_CN_MESSAGES = {
     "settings.s3_compatible_object_storage_with_5_gb_free_and_no_credit_card_required": "兼容 S3 的对象存储。免费容量 5 GB，无需信用卡。",
     "settings.scheduled": "定时",
     "settings.scroll_sync": "滚动同步",
+    "settings.collapse_long_code_blocks": "折叠较长的代码块",
+    "settings.collapse_long_code_blocks_description": "默认仅显示部分代码，需要时可展开阅读全文",
+    "settings.code_block_collapse_after": "超过以下行数后折叠",
+    "settings.lines": " 行",
     "settings.sec": "秒",
     "settings.select_file": "选择文件",
     "settings.select_backup_folder": "选择备份文件夹",
@@ -1014,7 +1019,6 @@ export const ZH_CN_MESSAGES = {
     "workspace.close_right_note": "关闭右侧笔记",
     "workspace.choose_a_note_or_write_a_new_one": "选一篇笔记，或者写一篇新的",
     "workspace.code_block": "代码块",
-    "workspace.definition_list": "定义列表",
     "workspace.details_block": "折叠内容",
     "workspace.differences_from_current_content": "与当前内容的差异",
     "workspace.divider": "分隔线",
@@ -1030,7 +1034,6 @@ export const ZH_CN_MESSAGES = {
     "workspace.inline_math": "行内公式",
     "workspace.insert_image": "插入图片",
     "workspace.insert_tag": "插入标签",
-    "workspace.inserted_text": "插入文本",
     "workspace.large_content_using_a_faster_comparison": "内容较大，已使用快速对比",
     "workspace.latest": "最近一次",
     "workspace.layout": "布局",
@@ -1050,7 +1053,6 @@ export const ZH_CN_MESSAGES = {
     "workspace.note_embed": "笔记嵌入",
     "workspace.note_syntax": "笔记语法",
     "workspace.open_a_note_from_the_list_or_press_shortcut_to_create_one": "左侧列表点一下就能打开；按 {shortcut} 新建",
-    "workspace.pandoc_attributes": "Pandoc 属性",
     "workspace.preview_only": "仅预览",
     "workspace.remote_image": "网络图片",
     "workspace.resize_editor_and_preview_panes": "调整编辑与预览宽度",
@@ -1060,8 +1062,6 @@ export const ZH_CN_MESSAGES = {
     "workspace.restored_to_selected_version": "已恢复到所选版本",
     "workspace.share": "分享",
     "workspace.split_view": "分栏",
-    "workspace.subscript": "下标",
-    "workspace.superscript": "上标",
     "workspace.table": "表格",
     "workspace.the_current_content_will_be_automatically_saved_as_a_new_version_first_a": "当前内容会先自动存为一个新版本，不会丢失。",
     "workspace.title": "[[标题]]",
@@ -1168,10 +1168,7 @@ aliases:
 | *斜体* | \`*斜体*\` |
 | ~~删除线~~ | \`~~删除线~~\` |
 | ==高亮== | \`==高亮==\` |
-| ++插入文本++ | \`++插入文本++\` |
 | \`行内代码\` | \`\` \`行内代码\` \`\` |
-| H~2~O | \`H~2~O\` |
-| x^2^ | \`x^2^\` |
 
 ### 链接、图片与笔记关系
 
@@ -1190,13 +1187,13 @@ aliases:
 ~~~~md-example title="块 ID 与块引用"
 这是一段可以被精确定位的内容。 ^markdown-demo
 
-点击 ((markdown-demo)) 可以跳回上面这段；也可以使用 [[#^markdown-demo]]。
+点击 [[#^markdown-demo]] 可以跳回上面这段。
 ~~~~
 
 ~~~~md-example title="笔记嵌入"
-这段内容会在下方被再次嵌入。 ^markdown-embed-demo
+这段内容会在下方被再次嵌入。 ^embed-demo
 
-![[#^markdown-embed-demo]]
+![[#^embed-demo|嵌入结果]]
 ~~~~
 
 ~~~~md-example title="脚注"
@@ -1204,6 +1201,8 @@ aliases:
 
 [^markdown-footnote]: 这是脚注的实际内容；点击编号可以在正文与脚注之间跳转。
 ~~~~
+
+Obsidian 注释不会出现在预览中：\`%% 单行注释 %%\`；多行内容可用单独的 \`%%\` 标记包围。
 
 ### 公式与图表
 
@@ -1222,17 +1221,20 @@ flowchart LR
 \`\`\`
 ~~~~
 
-~~~~md-example title="Pandoc 属性"
-##### 带自定义 ID 的标题 {#markdown-custom-heading .wide}
-
-[跳到上面的自定义标题](#markdown-custom-heading)
-~~~~
-
 ### 现代块级扩展
 
 ~~~~md-example title="Obsidian Callout"
-> [!NOTE] Callout 实际效果
+> [!NOTE]- 默认折叠并使用自定义标题
 > 这里可以放说明、任务、列表或其他 Markdown 内容。
+>
+> > [!TIP]+ 默认展开的嵌套 Callout
+> > 嵌套 Callout 使用相同语法。
+~~~~
+
+~~~~md-example title="折叠内容"
+::: details [点击展开]
+这里的内容会在展开折叠块后显示。
+:::
 ~~~~
 
 ~~~~md-example title="标签页"
@@ -1245,18 +1247,6 @@ flowchart LR
 这是第二个标签页的内容。
 :::
 ::::
-~~~~
-
-~~~~md-example title="折叠内容"
-::: details [点击展开 Markdown 折叠块]
-这里是折叠后的实际内容。
-:::
-
-<details>
-<summary>点击展开原生折叠块</summary>
-
-这里也可以继续写 Markdown。
-</details>
 ~~~~
 
 ~~~~md-example title="带标题、行号和高亮的代码块"

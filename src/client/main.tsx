@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client'
 import './styles/inter.css'
 import './styles/app.css'
 import { LOCALE_STORAGE_KEY, UI_STORAGE_KEY } from './lib/runtime'
+import { installViewportSizing } from './lib/viewport'
+
+installViewportSizing()
 
 async function start(): Promise<void> {
   if (import.meta.env.MODE === 'demo') {
@@ -12,9 +15,10 @@ async function start(): Promise<void> {
     await installDemoRuntime()
   }
 
-  const [{ App }, { t }] = await Promise.all([import('./App'), import('./lib/i18n')])
+  const [{ App }, i18n] = await Promise.all([import('./App'), import('./lib/i18n')])
+  await i18n.initI18n()
   const container = document.getElementById('root')
-  if (!container) throw new Error(t("app.missing_root_mount_point"))
+  if (!container) throw new Error(i18n.t("app.missing_root_mount_point"))
   createRoot(container).render(
     <StrictMode>
       <App />

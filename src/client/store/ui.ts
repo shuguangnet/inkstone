@@ -476,7 +476,10 @@ export const useUi = create<UiState>((set, get) => ({
   dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 
   applyAppearance: (patch) => {
-    set(patch)
+    const current = get()
+    if (Object.entries(patch).some(([key, value]) => current[key as keyof typeof patch] !== value)) {
+      set(patch)
+    }
     applyThemeToDom(get())
   },
 }))
@@ -489,9 +492,10 @@ export function applyThemeToDom(state: Pick<UiState, 'theme' | 'accent' | 'backg
   const dark =
     state.theme === 'dark' ||
     (state.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-  root.dataset.theme = dark ? 'dark' : 'light'
-  root.dataset.accent = state.accent
-  root.dataset.background = state.background
+  const theme = dark ? 'dark' : 'light'
+  if (root.dataset.theme !== theme) root.dataset.theme = theme
+  if (root.dataset.accent !== state.accent) root.dataset.accent = state.accent
+  if (root.dataset.background !== state.background) root.dataset.background = state.background
 }
 
 let themeTransitionTimer: number | undefined

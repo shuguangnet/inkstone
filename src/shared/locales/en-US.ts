@@ -220,6 +220,7 @@ export const EN_US_MESSAGES = {
     "common.save": "Save",
     "common.save_failed": "Save failed",
     "common.search_notes_or_run_a_command": "Search notes or run a command",
+    "shell.search": "Search",
     "common.settings": "Settings",
     "common.strikethrough": "Strikethrough",
     "common.tabs": "Tabs",
@@ -238,11 +239,9 @@ export const EN_US_MESSAGES = {
     "common.zoom_out": "Zoom out",
     "editor.column_1_column_2_column_3": "| Column 1 | Column 2 | Column 3 |",
     "editor.create_new_note": "Create new note",
-    "editor.definition": "Definition",
     "editor.start_writing": "Start writing…",
     "editor.tab_1": "Tab 1",
     "editor.tab_2": "Tab 2",
-    "editor.term": "Term",
     "editor.upload_failed_value0": "<!-- Upload failed: {value0} -->",
     "editor.uploading_value0": "![Uploading {value0}…]()",
     "feedback.dismiss": "Dismiss",
@@ -294,6 +293,7 @@ export const EN_US_MESSAGES = {
     "graph.reset": "Reset",
     "markdown.abstract": "Abstract",
     "markdown.code": "Code",
+    "markdown.collapse_code": "Collapse code",
     "markdown.code_highlighting_timed_out_while_loading": "Code highlighting timed out while loading",
     "markdown.copy_code": "Copy code",
     "markdown.could_not_load_embedded_content": "Could not load embedded content",
@@ -323,6 +323,7 @@ export const EN_US_MESSAGES = {
     "markdown.redrawing_chart": "Redrawing chart...",
     "markdown.rendering_diagram": "Rendering diagram…",
     "markdown.success": "Success",
+    "markdown.show_more_code": "Show {count} more lines",
     "markdown.tasks_in_embedded_notes_are_read_only": "Tasks in embedded notes are read-only",
     "markdown.the_front_matter_root_must_be_a_yaml_mapping": "The Front Matter root must be a YAML mapping",
     "markdown.the_tasks_in_the_example_are_read_only": "The tasks in the example are read-only",
@@ -778,6 +779,10 @@ export const EN_US_MESSAGES = {
     "settings.s3_compatible_object_storage_with_5_gb_free_and_no_credit_card_required": "S3-compatible object storage with 5 GB free and no credit card required.",
     "settings.scheduled": "Scheduled",
     "settings.scroll_sync": "Scroll sync",
+    "settings.collapse_long_code_blocks": "Collapse long code blocks",
+    "settings.collapse_long_code_blocks_description": "Show a compact preview and let readers expand code when needed",
+    "settings.code_block_collapse_after": "Collapse after",
+    "settings.lines": " lines",
     "settings.sec": " sec",
     "settings.select_file": "Select file",
     "settings.select_backup_folder": "Select backup folder",
@@ -1013,7 +1018,6 @@ export const EN_US_MESSAGES = {
     "workspace.close_right_note": "Close right note",
     "workspace.choose_a_note_or_write_a_new_one": "Choose a note, or write a new one",
     "workspace.code_block": "Code block",
-    "workspace.definition_list": "Definition list",
     "workspace.details_block": "Details block",
     "workspace.differences_from_current_content": "Differences from current content",
     "workspace.divider": "Divider",
@@ -1029,7 +1033,6 @@ export const EN_US_MESSAGES = {
     "workspace.inline_math": "Inline math",
     "workspace.insert_image": "Insert image",
     "workspace.insert_tag": "Insert tag",
-    "workspace.inserted_text": "Inserted text",
     "workspace.large_content_using_a_faster_comparison": "Large content · using a faster comparison",
     "workspace.latest": "Latest",
     "workspace.layout": "Layout",
@@ -1049,7 +1052,6 @@ export const EN_US_MESSAGES = {
     "workspace.note_embed": "Note embed",
     "workspace.note_syntax": "Note syntax",
     "workspace.open_a_note_from_the_list_or_press_shortcut_to_create_one": "Open a note from the list, or press {shortcut} to create one",
-    "workspace.pandoc_attributes": "Pandoc attributes",
     "workspace.preview_only": "Preview only",
     "workspace.remote_image": "Remote image",
     "workspace.resize_editor_and_preview_panes": "Resize editor and preview panes",
@@ -1059,8 +1061,6 @@ export const EN_US_MESSAGES = {
     "workspace.restored_to_selected_version": "Restored to selected version",
     "workspace.share": "Share",
     "workspace.split_view": "Split view",
-    "workspace.subscript": "Subscript",
-    "workspace.superscript": "Superscript",
     "workspace.table": "Table",
     "workspace.the_current_content_will_be_automatically_saved_as_a_new_version_first_a": "The current content will be automatically saved as a new version first and will not be lost.",
     "workspace.title": "[[title]]",
@@ -1167,10 +1167,7 @@ Under each example title, the **rendered result** is on the left and the **copya
 | *Italic* | \`*Italic*\` |
 | ~~Strikethrough~~ | \`~~Strikethrough~~\` |
 | ==Highlight== | \`==Highlight==\` |
-| ++Inserted text++ | \`++Inserted text++\` |
 | \`Inline code\` | \`\` \`Inline code\` \`\` |
-| H~2~O | \`H~2~O\` |
-| x^2^ | \`x^2^\` |
 
 ### Links, images, and note relationships
 
@@ -1189,13 +1186,13 @@ Under each example title, the **rendered result** is on the left and the **copya
 ~~~~md-example title="Block ID and reference"
 This content can be addressed precisely. ^markdown-demo
 
-Click ((markdown-demo)) to return to it, or use [[#^markdown-demo]].
+Click [[#^markdown-demo]] to return to it.
 ~~~~
 
 ~~~~md-example title="Note embed"
-This content is embedded again below. ^markdown-embed-demo
+This content is embedded again below. ^embed-demo
 
-![[#^markdown-embed-demo]]
+![[#^embed-demo|Embedded result]]
 ~~~~
 
 ~~~~md-example title="Footnote"
@@ -1203,6 +1200,8 @@ This sentence has an additional note.[^markdown-footnote]
 
 [^markdown-footnote]: This is the rendered footnote. Use its links to move between the reference and definition.
 ~~~~
+
+Obsidian comments are hidden in preview: \`%% one line %%\`, or place \`%%\` markers around multiple lines.
 
 ### Math and diagrams
 
@@ -1221,17 +1220,20 @@ flowchart LR
 \`\`\`
 ~~~~
 
-~~~~md-example title="Pandoc attributes"
-##### Heading with a custom ID {#markdown-custom-heading .wide}
-
-[Jump to the custom heading](#markdown-custom-heading)
-~~~~
-
 ### Modern block extensions
 
 ~~~~md-example title="Obsidian callout"
-> [!NOTE] Rendered callout
+> [!NOTE]- Folded callout with a custom title
 > Put explanations, tasks, lists, or other Markdown here.
+>
+> > [!TIP]+ Expanded nested callout
+> > Nested callouts use the same syntax.
+~~~~
+
+~~~~md-example title="Folded details block"
+::: details [Click to expand]
+This content is hidden until the details block is opened.
+:::
 ~~~~
 
 ~~~~md-example title="Tabs"
@@ -1244,18 +1246,6 @@ This is the first tab panel.
 This is the second tab panel.
 :::
 ::::
-~~~~
-
-~~~~md-example title="Folded content"
-::: details [Open the Markdown details block]
-This is the actual folded content.
-:::
-
-<details>
-<summary>Open the native details block</summary>
-
-Markdown can continue inside it.
-</details>
 ~~~~
 
 ~~~~md-example title="Code block with a title, line numbers, and highlighting"

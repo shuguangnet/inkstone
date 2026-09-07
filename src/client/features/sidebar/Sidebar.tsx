@@ -15,6 +15,7 @@ import { FolderAppearance, FolderPicker } from '../folders/FolderPicker';
 import { TagAppearance } from '../tags/TagAppearance';
 import { createTag, deleteTag, renameTag, setTagColor } from '../tags/tagMutations';
 import { t } from "../../lib/i18n";
+import { SearchButton } from '../shell/SearchButton';
 export function Sidebar({ collapsed = false, onCollapse, }: {
     collapsed?: boolean;
     onCollapse?: () => void;
@@ -37,6 +38,8 @@ export function Sidebar({ collapsed = false, onCollapse, }: {
             </IconButton>
           </Tooltip>)}
       </header>
+
+      <div className="shrink-0 px-2 pt-2"><SearchButton /></div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-2 pb-4">
         <div className="space-y-px">
@@ -76,6 +79,7 @@ function SidebarRail({ onExpand }: {
       </div>
 
       <div className="flex w-full flex-col items-center gap-1 py-2">
+        <SearchButton variant="icon" />
         <RailButton label={t("navigation.all_notes")} active={view === 'all'} icon={<FileText size={16}/>} onClick={() => openView('all')}/>
         <RailButton label={t("navigation.favorites")} active={view === 'starred'} icon={<Star size={16}/>} onClick={() => openView('starred')}/>
         <RailButton label={t("navigation.trash")} active={view === 'trash'} icon={<Trash2 size={16}/>} onClick={() => openView('trash')}/>

@@ -6,7 +6,7 @@ import { api, ApiError } from '../../lib/api';
 import { fullTime } from '../../lib/time';
 import { readingMinutes, countText } from '@shared/markdown-utils';
 import { renderMarkdown } from '../../lib/markdown/renderer';
-import { enhancePreview, renderPendingMermaid, resetMermaidNode } from '../../lib/markdown/enhance';
+import { enhancePreview, renderPendingMermaid, resetMermaidNode, toggleCodeBlockCollapse } from '../../lib/markdown/enhance';
 import { Avatar, Button, Logo } from '../../components/primitives';
 import { Input } from '../../components/form';
 import { LoadingBlock } from '../../components/feedback';
@@ -102,7 +102,7 @@ export function SharePage({ slug }: {
         let cancelled = false;
         const isCurrent = () => !cancelled && enhancementRevisionRef.current === revision && hostRef.current === host;
         void (async () => {
-            await enhancePreview(host, { math: true, mermaid: true, dark });
+            await enhancePreview(host, { math: true, mermaid: true, dark, codeBlockCollapseLines: 24 });
             if (!isCurrent())
                 return;
             await renderPendingMermaid(host, dark, { isCurrent });
@@ -158,6 +158,11 @@ export function SharePage({ slug }: {
             }).catch(() => toast({ title: t("preview.could_not_copy"), tone: 'danger' }));
             return;
         }
+        const collapseButton = target.closest<HTMLButtonElement>('[data-code-collapse]');
+        if (collapseButton) {
+            toggleCodeBlockCollapse(collapseButton);
+            return;
+        }
         const tabButton = target.closest<HTMLButtonElement>('[data-tab-button]');
         if (tabButton) {
             event.preventDefault();
@@ -177,7 +182,7 @@ export function SharePage({ slug }: {
         document.documentElement.dataset.theme = next ? 'dark' : 'light';
     };
     const stats = note ? countText(note.content) : null;
-    return (<div className="min-h-full bg-[var(--bg-base)]">
+    return (<div className="h-full overflow-y-auto overscroll-contain bg-[var(--bg-base)]">
       <header className="sticky top-0 z-10 border-b border-[var(--border-subtle)] bg-[var(--bg-base)]/85 pt-[env(safe-area-inset-top)] backdrop-blur">
         <div className="mx-auto flex h-12 max-w-[860px] items-center gap-3 px-4 md:px-5">
           <span className="flex items-center gap-1.5 text-[var(--accent)]">

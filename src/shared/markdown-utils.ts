@@ -34,7 +34,29 @@ export function stripCodeRegions(text: string): string {
     }
     lines[i] = line.replace(/`+[^`\n]*`+/g, (s) => ' '.repeat(s.length))
   }
-  return lines.join('\n')
+  return stripObsidianCommentRegions(lines.join('\n'))
+}
+
+function stripObsidianCommentRegions(text: string): string {
+  const chars = text.split('')
+  let start = -1
+  for (let index = 0; index < text.length - 1; index++) {
+    if (!text.startsWith('%%', index) || isEscaped(text, index)) continue
+    if (start < 0) start = index
+    else {
+      for (let cursor = start; cursor <= index + 1; cursor++) {
+        if (chars[cursor] !== '\n' && chars[cursor] !== '\r') chars[cursor] = ' '
+      }
+      start = -1
+    }
+    index++
+  }
+  if (start >= 0) {
+    for (let cursor = start; cursor < chars.length; cursor++) {
+      if (chars[cursor] !== '\n' && chars[cursor] !== '\r') chars[cursor] = ' '
+    }
+  }
+  return chars.join('')
 }
 
 export interface FrontMatterResult {
@@ -195,6 +217,7 @@ function tagSearchText(text: string): string {
     while (text[markerEnd] === '`') markerEnd++
     const markerLength = markerEnd - i
     let closing = markerEnd
+    let matched = false
     while (closing < text.length) {
       closing = text.indexOf('`', closing)
       if (closing < 0) break
@@ -203,11 +226,12 @@ function tagSearchText(text: string): string {
       if (closingEnd - closing === markerLength) {
         protect(i, closingEnd)
         i = closingEnd
+        matched = true
         break
       }
       closing = closingEnd
     }
-    if (closing < 0) i = markerEnd
+    if (!matched) i = markerEnd
   }
 
   const protectPattern = (pattern: RegExp) => {
@@ -228,6 +252,18 @@ function tagSearchText(text: string): string {
   protectPattern(/<!--(?:[\s\S]*?-->|[\s\S]*$)/g)
   protectPattern(/\$\$(?:[\s\S]*?\$\$|[\s\S]*$)/g)
   protectPattern(/\$(?!\s)(?:[^$\\]|\\.)+?(?<!\s)\$/g)
+
+  let commentStart = -1
+  for (let index = 0; index < text.length - 1; index++) {
+    if (protectedChars[index] || !text.startsWith('%%', index) || isEscaped(text, index)) continue
+    if (commentStart < 0) commentStart = index
+    else {
+      protect(commentStart, index + 2)
+      commentStart = -1
+    }
+    index++
+  }
+  if (commentStart >= 0) protect(commentStart, text.length)
 
   lineStart = 0
   while (lineStart < text.length) {
@@ -627,7 +663,6 @@ export function toPlainText(md: string): string {
   t = t.replace(/(\*|_)(.*?)\1/g, '$2')
   t = t.replace(/~~(.*?)~~/g, '$1')
   t = t.replace(/==(.*?)==/g, '$1')
-  t = t.replace(/\+\+(.*?)\+\+/g, '$1')
   t = t.replace(/<[^>]{1,300}>/g, '')
   t = t.replace(/^\[\^[^\]]+\]:/gm, '')
   t = t.replace(/\[\^[^\]]+\]/g, '')

@@ -30,6 +30,7 @@ import { createContextualNote, useActiveNote, useNotes } from '../../store/notes
 import { folderPathLabel, openFolderView } from '../../lib/folders';
 import { useSyncScroll } from './sync-scroll';
 import { t, useLocale } from "../../lib/i18n";
+import { preferredScrollBehavior } from '../../lib/motion';
 const SPLIT_HANDLE_WIDTH = 1;
 const PREVIEW_BORDER_WIDTH = 1;
 const OUTLINE_WIDTH = 168;
@@ -183,25 +184,22 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
     }, [view]);
     const invalidateSyncAnchors = useSyncScroll(view, previewScrollerRef, settings.preview.syncScroll && layout === 'split');
     const jumpToHeading = useCallback((heading: Heading) => {
-        const scroller = previewScrollerRef.current;
-        const target = scroller?.querySelector<HTMLElement>(`#${CSS.escape(heading.slug)}`);
-        if (target && scroller) {
-            scroller.scrollTo({ top: target.offsetTop - 12, behavior: 'smooth' });
-        }
         if (view) {
             const line = Math.min(view.state.doc.lines, heading.line + 1);
             const pos = view.state.doc.line(line).from;
             view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
         }
+        const target = previewScrollerRef.current?.querySelector<HTMLElement>(`#${CSS.escape(heading.slug)}`);
+        target?.scrollIntoView({ behavior: preferredScrollBehavior(), block: 'start', inline: 'nearest' });
     }, [view]);
     useEffect(() => {
-        if (!note || !view || !paneActive)
+        if (!note || !paneActive)
             return;
         const frame = window.requestAnimationFrame(() => {
             if (!note.title)
                 titleInputRef.current?.focus();
             else
-                view.focus();
+                view?.focus();
         });
         return () => window.cancelAnimationFrame(frame);
     }, [note?.id, paneActive, view]);
@@ -326,7 +324,8 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
             onKeyDown={(event) => {
                 if (event.key !== 'Enter') return;
                 event.preventDefault();
-                view?.focus();
+                if (view) view.focus();
+                else event.currentTarget.blur();
             }}
           />
           {note.isStarred && <Star size={11} className="shrink-0 fill-current text-[var(--warning)]"/>}
@@ -366,7 +365,7 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
         ]}/>
           </div>
           <Tooltip label={note.isStarred ? t("common.remove_from_favorites") : t("navigation.favorites")} combo="mod+d">
-            <IconButton label={t("navigation.favorites")} size="sm" active={note.isStarred} onClick={() => void patchNote(note.id, { isStarred: !note.isStarred })}>
+            <IconButton label={note.isStarred ? t("common.remove_from_favorites") : t("navigation.favorites")} size="sm" active={note.isStarred} onClick={() => void patchNote(note.id, { isStarred: !note.isStarred })}>
               <Star size={14} className={note.isStarred ? 'fill-current' : undefined}/>
             </IconButton>
           </Tooltip>
