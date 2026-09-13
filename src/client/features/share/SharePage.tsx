@@ -20,6 +20,7 @@ export function SharePage({ slug }: {
 }) {
     const locale = useLocale();
     const [note, setNote] = useState<PublicNote | null>(null);
+    const [blog, setBlog] = useState<PublicNote['blog'] | null>(null);
     const [needPassword, setNeedPassword] = useState(false);
     const [password, setPassword] = useState('');
     const [error, setError] = useState<string | null>(null);
@@ -43,6 +44,7 @@ export function SharePage({ slug }: {
             if (controller.signal.aborted)
                 return;
             setNote(result);
+            setBlog(result.blog ?? null);
             setNeedPassword(false);
             setPassword('');
             const title = `${result.title || t("common.untitled_note")} · ${result.site.name}`;
@@ -106,11 +108,26 @@ export function SharePage({ slug }: {
             if (!isCurrent())
                 return;
             await renderPendingMermaid(host, dark, { isCurrent });
+            if (!isCurrent())
+                return;
+            if (blog && blog.links.length > 0) {
+                const byTitle = new Map(blog.links.map((link) => [link.title, link.slug]));
+                host.querySelectorAll<HTMLElement>('[data-wikilink]').forEach((element) => {
+                    const raw = element.dataset.wikilink ?? '';
+                    const target = byTitle.get(raw) ?? byTitle.get(raw.trim());
+                    if (target === undefined) return;
+                    element.setAttribute('href', `/s/${target}`);
+                    element.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        window.location.assign(`/s/${target}`);
+                    });
+                });
+            }
         })();
         return () => {
             cancelled = true;
         };
-    }, [rendered, dark]);
+    }, [rendered, dark, blog]);
     useEffect(() => () => {
         enhancementRevisionRef.current++;
         for (const timer of copyResetTimersRef.current.values())
@@ -191,6 +208,12 @@ export function SharePage({ slug }: {
           <span className="text-[12.5px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
             {note?.site.name ?? 'Inkstone'}
           </span>
+          {blog && (<a
+              href={`/s/blog/${blog.slug}`}
+              className="rounded-[var(--r-md)] px-2 py-1 text-[11.5px] text-[var(--accent)] transition-colors hover:bg-[var(--bg-hover)]"
+          >
+            ← {blog.title}
+          </a>)}
           <span className="flex-1"/>
           <Tooltip label={t("share.switch_theme")} side="left">
             <button type="button" onClick={toggleTheme} aria-label={t("share.switch_theme")} className="inline-flex size-9 items-center justify-center rounded-[var(--r-md)] text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] md:size-7">

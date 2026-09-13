@@ -36,6 +36,9 @@ const allowed = new Map([
   ["src/client/features/list/TasksView.tsx", [
     "/** Aggregated open-task view across the whole notebook. */",
   ]],
+  ["src/client/features/share/BlogPage.tsx", [
+    "/** Public front page of a published blog/wiki collection at /s/blog/:slug. */",
+  ]],
   ["src/client/features/share/share-form.ts", [
     "// A new or replaced passcode must be at least 4 characters (the server",
     "// enforces the same minimum); short codes are trivially brute-forced.",
@@ -99,6 +102,8 @@ const allowed = new Map([
   ]],
   ["src/shared/types.ts", [
     "/** Free-form instructions appended to every AI assistant system prompt. */",
+    "/** Title → slug mapping of every published post in the collection, used\n   * to resolve WikiLinks between public notes. */",
+    "/** Present when the note belongs to a published blog collection. */",
   ]],
   ["src/worker/ai/prompts.ts", [
     "/** System rules every assistant call receives. User note text is always\n * wrapped in explicit delimiters so instructions inside notes are data. */",
@@ -230,6 +235,9 @@ const allowed = new Map([
   ]],
   ["src/worker/routes/mcp-settings.ts", [
     "// Kick off the first batch immediately; the rest is drained by the cron.",
+  ]],
+  ["src/worker/routes/share.ts", [
+    "/** Public blog index JSON backing the /s/blog/:slug front page. */",
   ]],
   ["src/worker/routes/sync.ts", [
     "// A non-empty `after` key always means the caller is mid-way through a",

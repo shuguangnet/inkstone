@@ -22,6 +22,7 @@ import type {
   PatchNoteBody,
   PasswordLoginResult,
   PublicUser,
+  PublicBlog,
   PublicNote,
   SearchResponse,
   SessionInfo,
@@ -534,6 +535,8 @@ export const api = {
     remove: (noteId: string) => request<{ ok: true }>(`/api/share/${noteId}`, { method: 'DELETE' }),
     read: (slug: string, password?: string, signal?: AbortSignal) =>
       request<PublicNote>(`/api/public/${slug}`, { method: 'POST', body: { password }, signal }),
+    blog: (slug: string, signal?: AbortSignal) =>
+      request<PublicBlog>(`/api/public/blog/${slug}`, { signal }),
     createBlog: (folderId: string) =>
       request<{ slug: string; url: string; title: string; notes: number }>('/api/share/blog', {
         method: 'POST',

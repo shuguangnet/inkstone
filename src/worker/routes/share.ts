@@ -199,6 +199,39 @@ shareManageRoutes.delete('/:noteId', async (c) => {
 })
 
 
+/** Public blog index JSON backing the /s/blog/:slug front page. */
+shareRoutes.get('/blog/:slug', async (c) => {
+  const slug = c.req.param('slug')
+  if (!isValidSlug(slug)) throw ApiError.notFound('The blog does not exist')
+  const collection = await c.env.DB.prepare(
+    'SELECT slug, user_id, folder_id, title FROM blog_collections WHERE slug = ?1',
+  ).bind(slug).first<{ slug: string; user_id: string; folder_id: string; title: string }>()
+  if (collection === null) throw ApiError.notFound('The blog does not exist')
+  const { results } = await c.env.DB.prepare(
+    `SELECT s.slug, n.title, n.excerpt, n.updated_at
+       FROM notes n JOIN shares s ON s.note_id = n.id AND s.user_id = n.user_id
+      WHERE n.user_id = ?1 AND n.folder_id = ?2 AND n.deleted_at IS NULL AND n.is_archived = 0
+      ORDER BY n.updated_at DESC`,
+  ).bind(collection.user_id, collection.folder_id).all<{
+    slug: string
+    title: string
+    excerpt: string
+    updated_at: number
+  }>()
+  const posts = (results ?? []).map((row) => ({
+    slug: row.slug,
+    title: row.title || 'Untitled note',
+    excerpt: row.excerpt,
+    updatedAt: row.updated_at,
+  }))
+  return c.json({
+    slug: collection.slug,
+    title: collection.title,
+    siteName: c.env.APP_NAME || 'Inkstone',
+    posts,
+  })
+})
+
 shareRoutes.post('/:slug', async (c) => {
   const slug = c.req.param('slug')
   if (!isValidSlug(slug)) throw ApiError.notFound('The link does not exist or has been revoked')
@@ -255,7 +288,7 @@ shareRoutes.post('/:slug', async (c) => {
   }
 
   const note = await c.env.DB.prepare(
-    `SELECT n.title, n.content, n.created_at, n.updated_at, u.name, u.avatar_url
+    `SELECT n.title, n.content, n.folder_id, n.created_at, n.updated_at, u.name, u.avatar_url
        FROM notes n JOIN users u ON u.id = n.user_id
       WHERE n.id = ?1 AND n.user_id = ?2 AND n.deleted_at IS NULL`,
   )
@@ -263,6 +296,7 @@ shareRoutes.post('/:slug', async (c) => {
     .first<{
       title: string
       content: string
+      folder_id: string | null
       created_at: number
       updated_at: number
       name: string
@@ -289,6 +323,25 @@ shareRoutes.post('/:slug', async (c) => {
     })
   }
 
+  const blogRow = await c.env.DB.prepare(
+    'SELECT slug, title FROM blog_collections WHERE user_id = ?1 AND folder_id = ?2',
+  ).bind(share.user_id, note.folder_id).first<{ slug: string; title: string }>()
+  let blog: PublicNote['blog']
+  if (blogRow && note.folder_id !== null) {
+    const linked = await c.env.DB.prepare(
+      `SELECT n.title, s.slug
+         FROM notes n JOIN shares s ON s.note_id = n.id AND s.user_id = n.user_id
+        WHERE n.user_id = ?1 AND n.folder_id = ?2 AND n.deleted_at IS NULL AND n.is_archived = 0`,
+    ).bind(share.user_id, note.folder_id).all<{ title: string; slug: string }>()
+    blog = {
+      slug: blogRow.slug,
+      title: blogRow.title,
+      links: (linked.results ?? [])
+        .filter((row) => row.title !== '')
+        .map((row) => ({ title: row.title, slug: row.slug })),
+    }
+  }
+
   const body_: PublicNote = {
     title: note.title,
     content: note.content,
@@ -297,6 +350,7 @@ shareRoutes.post('/:slug', async (c) => {
     author: { name: note.name, avatarUrl: note.avatar_url },
     site: { name: c.env.APP_NAME || 'Inkstone' },
     share: { slug },
+    ...(blog === undefined ? {} : { blog }),
   }
   return c.json(body_)
 })
@@ -305,33 +359,28 @@ shareRoutes.post('/:slug', async (c) => {
 sharePageRoutes.get('/blog/:slug', async (c) => {
   const slug = c.req.param('slug')
   const url = new URL(c.req.url)
-  if (!isValidSlug(slug)) return renderShareShell(c, url, null)
-  const collection = await c.env.DB.prepare(
-    'SELECT slug, user_id, folder_id, title FROM blog_collections WHERE slug = ?1',
-  ).bind(slug).first<{ slug: string; user_id: string; folder_id: string; title: string }>()
-  if (collection === null) return renderShareShell(c, url, null)
-  const entries = await c.env.DB.prepare(
-    `SELECT s.slug, n.title, n.excerpt, n.updated_at
-       FROM notes n JOIN shares s ON s.note_id = n.id AND s.user_id = n.user_id
-      WHERE n.user_id = ?1 AND n.folder_id = ?2 AND n.deleted_at IS NULL AND n.is_archived = 0
-      ORDER BY n.updated_at DESC`,
-  ).bind(collection.user_id, collection.folder_id).all<{ slug: string; title: string; excerpt: string; updated_at: number }>()
+  let collection: { title: string } | null = null
+  if (isValidSlug(slug)) {
+    collection = await c.env.DB.prepare(
+      'SELECT title FROM blog_collections WHERE slug = ?1',
+    ).bind(slug).first<{ title: string }>()
+  }
+  const shell = await renderShareShell(c, url, null)
+  if (collection === null) return shell
+  let html = await shell.text()
   const siteName = c.env.APP_NAME || 'Inkstone'
-  const items = (entries.results ?? [])
-    .map((entry) => `    <li><a href="/s/${escapeHtml(entry.slug)}">${escapeHtml(entry.title || 'Untitled note')}</a></li>`)
-    .join('\n')
-  const html = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="robots" content="noindex, nofollow" />
-<title>${escapeHtml(collection.title)} · ${escapeHtml(siteName)}</title>
-<style>body{font-family:Georgia,serif;max-width:640px;margin:3rem auto;padding:0 1rem;color:#1a1a1a}h1{font-size:1.6rem}li{margin:.5rem 0}a{color:inherit;text-decoration:underline}small{color:#888}</style>
-</head><body><h1>${escapeHtml(collection.title)}</h1>
-<small>${entries.results?.length ?? 0} notes · ${escapeHtml(siteName)}</small>
-<ul>
-${items}
-</ul></body></html>`
-  return c.html(html, 200, { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' })
+  const meta = [
+    `<title>${escapeHtml(collection.title)} · ${escapeHtml(siteName)}</title>`,
+    `<meta property="og:type" content="website" />`,
+    `<meta property="og:title" content="${escapeHtml(collection.title)}" />`,
+    `<meta property="og:site_name" content="${escapeHtml(siteName)}" />`,
+    `<meta name="robots" content="noindex, nofollow" />`,
+  ].join('\n    ')
+  html = html.replace(/<title>[\s\S]*?<\/title>/i, '').replace('</head>', `    ${meta}\n  </head>`)
+  return c.html(html, 200, {
+    'Cache-Control': 'no-store',
+    'X-Robots-Tag': 'noindex',
+  })
 })
 
 sharePageRoutes.get('/:slug', async (c) => {

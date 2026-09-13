@@ -478,6 +478,31 @@ export interface ShareInfo {
   createdAt: number
 }
 
+export interface PublicBlogLink {
+  title: string
+  slug: string
+}
+
+export interface PublicBlogRef {
+  slug: string
+  title: string
+  /** Title → slug mapping of every published post in the collection, used
+   * to resolve WikiLinks between public notes. */
+  links: PublicBlogLink[]
+}
+
+export interface PublicBlogPost extends PublicBlogLink {
+  excerpt: string
+  updatedAt: number
+}
+
+export interface PublicBlog {
+  slug: string
+  title: string
+  siteName: string
+  posts: PublicBlogPost[]
+}
+
 export interface PublicNote {
   title: string
   content: string
@@ -486,6 +511,8 @@ export interface PublicNote {
   author: { name: string; avatarUrl: string }
   site: { name: string }
   share: { slug: string }
+  /** Present when the note belongs to a published blog collection. */
+  blog?: PublicBlogRef
 }
 
 

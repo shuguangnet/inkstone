@@ -15,6 +15,9 @@ const AppShell = lazy(() =>
 const SharePage = lazy(() =>
   import('./features/share/SharePage').then((module) => ({ default: module.SharePage })),
 )
+const BlogPage = lazy(() =>
+  import('./features/share/BlogPage').then((module) => ({ default: module.BlogPage })),
+)
 
 export function App() {
 
@@ -23,6 +26,10 @@ export function App() {
   const load = useSession((s) => s.load)
   const [shareSlug] = useState(() => {
     const match = /^\/s\/([A-Za-z0-9_-]+)/.exec(location.pathname)
+    return match?.[1] ?? null
+  })
+  const [blogSlug] = useState(() => {
+    const match = /^\/s\/blog\/([A-Za-z0-9_-]+)/.exec(location.pathname)
     return match?.[1] ?? null
   })
 
@@ -49,8 +56,20 @@ export function App() {
     if (shareSlug) return
     const timer = window.setTimeout(() => dismissBootScreen(), 8000)
     return () => window.clearTimeout(timer)
-  }, [shareSlug])
+  }, [shareSlug, blogSlug])
 
+  if (blogSlug) {
+    return (
+      <>
+        <ErrorBoundary>
+          <Suspense fallback={<PageFallback />}>
+            <BlogPage slug={blogSlug} />
+          </Suspense>
+        </ErrorBoundary>
+        <Toaster />
+      </>
+    )
+  }
   if (shareSlug) {
     return (
       <>
