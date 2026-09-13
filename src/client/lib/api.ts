@@ -287,7 +287,16 @@ export interface AiSettingsUpdate {
   dailyCharQuota?: number
 }
 
+export interface AggregatedTask {
+  noteId: string
+  noteTitle: string
+  text: string
+  line: number
+}
+
 export const api = {
+  tasks: (signal?: AbortSignal) =>
+    request<{ tasks: AggregatedTask[] }>('/api/tasks', { signal }),
   ai: {
     status: (signal?: AbortSignal) => request<AiStatusResponse>('/api/ai/status', { signal }),
     models: (signal?: AbortSignal) =>
@@ -466,6 +475,12 @@ export const api = {
       request<TestConnectionResult>('/api/backup/test', { method: 'POST', body }),
     run: (targetIds?: string[]) => request<BackupRun>('/api/backup/run', { method: 'POST', body: { targetIds } }),
     runs: () => request<{ runs: BackupRun[] }>('/api/backup/runs'),
+    restore: (targetId: string, stamp?: string) =>
+      request<{ restored: true; stamp: string; result: ImportResult }>('/api/backup/restore', {
+        method: 'POST',
+        body: { targetId, ...(stamp === undefined ? {} : { stamp }) },
+        timeoutMs: 120_000,
+      }),
   },
 
   settings: {
@@ -517,6 +532,12 @@ export const api = {
     remove: (noteId: string) => request<{ ok: true }>(`/api/share/${noteId}`, { method: 'DELETE' }),
     read: (slug: string, password?: string, signal?: AbortSignal) =>
       request<PublicNote>(`/api/public/${slug}`, { method: 'POST', body: { password }, signal }),
+    createBlog: (folderId: string) =>
+      request<{ slug: string; url: string; title: string; notes: number }>('/api/share/blog', {
+        method: 'POST',
+        body: { folderId },
+      }),
+    removeBlog: (slug: string) => request<{ ok: true }>(`/api/share/blog/${slug}`, { method: 'DELETE' }),
   },
 
   transfer: {

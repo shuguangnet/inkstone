@@ -121,7 +121,8 @@ export const SCHEMA_STATEMENTS: readonly string[] = [
     width INTEGER,
     height INTEGER,
     storage TEXT NOT NULL CHECK (storage IN ('r2', 'kv')),
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    ai_description TEXT
   )`,
   `CREATE INDEX IF NOT EXISTS idx_attachments_user ON attachments(user_id, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_attachments_user_sha ON attachments(user_id, sha256)`,
@@ -188,6 +189,15 @@ export const SCHEMA_STATEMENTS: readonly string[] = [
     created_at INTEGER NOT NULL
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_shares_note ON shares(note_id)`,
+
+  `CREATE TABLE IF NOT EXISTS blog_collections (
+    slug TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    folder_id TEXT NOT NULL,
+    title TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
 
   `CREATE TABLE IF NOT EXISTS share_asset_sessions (
     id TEXT PRIMARY KEY,
@@ -524,6 +534,38 @@ const SCHEMA_MIGRATIONS: readonly SchemaMigration[] = [
          ON totp_login_challenges(expires_at)`,
     ],
   },
+  {
+    version: 12,
+    skipIfColumnExists: { table: 'attachments', column: 'ai_description' },
+    statements: [
+      `ALTER TABLE attachments ADD COLUMN ai_description TEXT`,
+      `CREATE TABLE IF NOT EXISTS blog_collections (
+         slug TEXT PRIMARY KEY,
+         user_id TEXT NOT NULL,
+         folder_id TEXT NOT NULL,
+         title TEXT NOT NULL DEFAULT '',
+         created_at INTEGER NOT NULL,
+         updated_at INTEGER NOT NULL
+       )`,
+      `CREATE TABLE IF NOT EXISTS ai_settings (
+         user_id TEXT PRIMARY KEY,
+         enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+         provider TEXT NOT NULL DEFAULT 'workers_ai' CHECK (provider IN ('workers_ai', 'openai_compat')),
+         model TEXT NOT NULL DEFAULT '',
+         base_url TEXT NOT NULL DEFAULT '',
+         credential TEXT,
+         daily_char_quota INTEGER NOT NULL DEFAULT 50000,
+         updated_at INTEGER NOT NULL
+       )`,
+      `CREATE TABLE IF NOT EXISTS ai_usage (
+         user_id TEXT NOT NULL,
+         day TEXT NOT NULL,
+         chars INTEGER NOT NULL DEFAULT 0,
+         requests INTEGER NOT NULL DEFAULT 0,
+         PRIMARY KEY (user_id, day)
+       )`,
+    ],
+  },
 ]
 
 const FTS_STATEMENT = `CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
@@ -591,6 +633,7 @@ const REQUIRED_TABLES = [
   'backup_runs',
   'shares',
   'share_asset_sessions',
+  'blog_collections',
   'changes',
   'sessions',
   'login_attempts',

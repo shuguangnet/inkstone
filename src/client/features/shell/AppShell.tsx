@@ -14,6 +14,15 @@ import { useSession } from '../../store/session';
 import { useUpdate } from '../../store/update';
 import { Sidebar } from '../sidebar/Sidebar';
 import { NoteList } from '../list/NoteList';
+import { TasksView } from '../list/TasksView';
+import { CalendarView } from '../list/CalendarView';
+
+function ListPane() {
+    const view = useUi((s) => s.view);
+    if (view === 'tasks') return <TasksView />;
+    if (view === 'calendar') return <CalendarView />;
+    return <NoteList />;
+}
 import { SearchButton } from './SearchButton';
 import { Resizer, SplitResizer } from './Resizer';
 import { t } from "../../lib/i18n";
@@ -97,7 +106,7 @@ export function AppShell() {
 
         {showList && (<>
             <div style={{ width: listWidth }} className="anim-view-content shrink-0 overflow-hidden">
-              <NoteList />
+              <ListPane />
             </div>
             <Resizer label={t("shell.resize_note_list")} value={listWidth} min={PANEL_WIDTHS.noteList.min} max={PANEL_WIDTHS.noteList.max} onChange={(listWidth) => setLayout({ listWidth })} onReset={() => setLayout({ listWidth: PANEL_WIDTHS.noteList.min })}/>
           </>)}
@@ -150,7 +159,7 @@ function MobileShell() {
           <Sidebar onCollapse={() => setPane('list')}/>
         </div>
         <div aria-hidden={pane !== 'list'} inert={pane !== 'list'} data-active={pane === 'list' || undefined} className="mobile-pane-layer absolute inset-0">
-          <NoteList />
+          <ListPane />
         </div>
         <div aria-hidden={!notePane} inert={!notePane} data-active={notePane || undefined} data-from="right" className="mobile-pane-layer absolute inset-0">
           {notePane && activeNoteId && (<Suspense fallback={<WorkspaceFallback />}><Workspace mobileLayout={pane === 'preview' ? 'preview' : 'edit'} onMobileBack={() => setPane('list')}/></Suspense>) }

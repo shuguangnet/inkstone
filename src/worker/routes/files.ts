@@ -193,6 +193,26 @@ filesRoutes.post('/', requireAuth, async (c) => {
     createdAt: now,
   })
 
+  let aiDescription: string | undefined
+  if (c.env.AI && stored.mime.startsWith('image/') && bytes.byteLength <= 4_000_000) {
+    try {
+      const result = await c.env.AI.run('@cf/meta/llama-3.2-11b-vision-instruct', {
+        image: Array.from(bytes),
+        prompt: 'Describe this image in one short sentence for an image alt text.',
+        max_tokens: 80,
+      }) as { description?: string }
+      const description = typeof result?.description === 'string' ? result.description.trim() : ''
+      if (description !== '') {
+        aiDescription = description.slice(0, 300)
+        await c.env.DB.prepare(
+          'UPDATE attachments SET ai_description = ?1 WHERE id = ?2 AND user_id = ?3',
+        ).bind(aiDescription, id, userId).run()
+      }
+    } catch {
+      // Descriptions are best-effort; uploads never fail because of them.
+    }
+  }
+
   const attachment: Attachment = {
     id,
     noteId,
@@ -204,7 +224,7 @@ filesRoutes.post('/', requireAuth, async (c) => {
     url: `/api/files/${id}`,
     createdAt: now,
   }
-  return c.json(attachment, 201)
+  return c.json({ ...attachment, ...(aiDescription === undefined ? {} : { aiDescription }) }, 201)
 })
 
 

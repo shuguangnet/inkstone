@@ -184,7 +184,7 @@ export function DataSettings() {
           <Button size="sm" icon={<FileUp size={13}/>} loading={busy === 'import'} disabled={busy !== null} onClick={() => fileRef.current?.click()}>{t("settings.select_file")}</Button>
         </SettingRow>
 
-        <input ref={fileRef} type="file" hidden multiple accept=".md,.markdown,.txt,.json,.zip" onChange={async (event) => {
+        <input ref={fileRef} type="file" hidden multiple accept=".md,.markdown,.txt,.json,.zip,.enex" onChange={async (event) => {
             const files = [...(event.target.files ?? [])];
             event.target.value = '';
             if (!files.length)

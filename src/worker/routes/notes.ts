@@ -26,7 +26,7 @@ import { isValidId, newId } from '../lib/id'
 import { broadcastCursor, scheduleFtsDrain } from '../lib/notify'
 import { assertContentSize, clampInt, JSON_BODY_LIMITS, readJson } from '../lib/request'
 import { requireAuth } from '../middleware/auth'
-import { enqueueNoteIndex, noteIndexQueueStatement } from '../mcp/ai-search'
+import { enqueueNoteIndexUnlessEncrypted, noteIndexQueueStatement } from '../mcp/ai-search'
 
 export const notesRoutes = new Hono<AppBindings>()
 
@@ -332,7 +332,7 @@ notesRoutes.post('/', async (c) => {
   if (!created) throw ApiError.conflict('This note id is already in use')
   await broadcastCursor(c)
   if (insertResult?.meta.changes) {
-    await enqueueNoteIndex(c.env.DB, userId, id, 'embed')
+    await enqueueNoteIndexUnlessEncrypted(c.env.DB, userId, id, 'embed')
     scheduleFtsDrain(c)
   }
   const note = toNote(created)
@@ -557,7 +557,7 @@ notesRoutes.patch('/:id', async (c) => {
   }
   await broadcastCursor(c, rewroteInbound ? undefined : changeResult?.results?.[0]?.seq)
   if (contentChanged || newTitle !== row.title) {
-    await enqueueNoteIndex(c.env.DB, userId, id, 'embed')
+    await enqueueNoteIndexUnlessEncrypted(c.env.DB, userId, id, 'embed')
     scheduleFtsDrain(c)
   }
   const nextTags = contentChanged ? (derivedTags ?? extractTags(newContent)) : null
@@ -657,7 +657,7 @@ notesRoutes.post('/:id/restore', async (c) => {
     throw ApiError.conflict('This note was modified elsewhere', { server: await loadNote(c.env.DB, userId, id) })
   }
   await broadcastCursor(c)
-  await enqueueNoteIndex(c.env.DB, userId, id, 'embed')
+  await enqueueNoteIndexUnlessEncrypted(c.env.DB, userId, id, 'embed')
   scheduleFtsDrain(c)
   const note = await loadNote(c.env.DB, userId, id)
   return c.json(note)
@@ -812,7 +812,7 @@ notesRoutes.post('/:id/duplicate', async (c) => {
     throw error
   }
   await broadcastCursor(c)
-  await enqueueNoteIndex(c.env.DB, userId, id, 'embed')
+  await enqueueNoteIndexUnlessEncrypted(c.env.DB, userId, id, 'embed')
   scheduleFtsDrain(c)
   const note = await loadNote(c.env.DB, userId, id)
   return c.json(note, 201)
@@ -938,7 +938,7 @@ notesRoutes.post('/:id/versions/:versionId/restore', async (c) => {
     throw ApiError.conflict('This note was modified elsewhere', { server: await loadNote(c.env.DB, userId, id) })
   }
   await broadcastCursor(c)
-  await enqueueNoteIndex(c.env.DB, userId, id, 'embed')
+  await enqueueNoteIndexUnlessEncrypted(c.env.DB, userId, id, 'embed')
   scheduleFtsDrain(c)
   const note = await loadNote(c.env.DB, userId, id)
   return c.json(note)
