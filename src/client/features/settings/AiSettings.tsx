@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Bot, Sparkles } from 'lucide-react'
+import { Bot, ListRestart, Sparkles } from 'lucide-react'
 import { api, type AiStatusResponse } from '../../lib/api'
 import { Button, IconButton } from '../../components/primitives'
 import { Input, SettingRow, Segmented, Switch } from '../../components/form'
@@ -32,6 +32,8 @@ export function AiSettings() {
   const [form, setForm] = useState<FormState>(fromStatus(null))
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [models, setModels] = useState<string[] | null>(null)
+  const [loadingModels, setLoadingModels] = useState(false)
   const loadStatus = useAi((s) => s.loadStatus)
 
   useEffect(() => {
@@ -67,6 +69,24 @@ export function AiSettings() {
       setMessage(error instanceof Error ? error.message : String(error))
     } finally {
       setSaving(false)
+    }
+  }
+
+  const fetchModels = async () => {
+    setLoadingModels(true)
+    setMessage(null)
+    try {
+      const result = await api.ai.models()
+      setModels(result.models)
+      if (form.model === '' && result.models.length > 0) {
+        const first = result.models[0]!
+        setForm((current) => ({ ...current, model: first }))
+        await save({ model: first })
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    } finally {
+      setLoadingModels(false)
     }
   }
 
@@ -120,14 +140,40 @@ export function AiSettings() {
       </>)}
 
       <SettingRow title={t("settings.ai_model")}>
-        <Input
-          value={form.model}
-          placeholder={openai ? 'gpt-4o-mini' : '@cf/meta/llama-3.3-70b-instruct-fp8-fast'}
-          className="w-[260px]"
-          onChange={(event) => setForm((current) => ({ ...current, model: event.target.value }))}
-          onBlur={() => void save({ model: form.model })}
-        />
+        <div className="flex items-center gap-1.5">
+          <Input
+            value={form.model}
+            placeholder={openai ? 'gpt-4o-mini' : '@cf/meta/llama-3.3-70b-instruct-fp8-fast'}
+            className="w-[220px]"
+            onChange={(event) => setForm((current) => ({ ...current, model: event.target.value }))}
+            onBlur={() => void save({ model: form.model })}
+          />
+          <IconButton
+            label={t("settings.ai_fetch_models")}
+            size="sm"
+            disabled={loadingModels || (openai && (!status?.settings.hasKey || form.baseUrl === ''))}
+            onClick={() => void fetchModels()}
+          >
+            <ListRestart size={13}/>
+          </IconButton>
+        </div>
       </SettingRow>
+
+      {models !== null && models.length > 0 && (<SettingRow title={t("settings.ai_models_available")}>
+        <select
+          className="h-[30px] w-[260px] rounded-[var(--r-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-2 text-[13px] outline-none focus:border-[var(--accent)]"
+          value={models.includes(form.model) ? form.model : ''}
+          onChange={(event) => {
+            const model = event.target.value
+            if (model === '') return
+            setForm((current) => ({ ...current, model }))
+            void save({ model })
+          }}
+        >
+          <option value="" disabled>{t("settings.ai_models_pick")}</option>
+          {models.map((model) => (<option key={model} value={model}>{model}</option>))}
+        </select>
+      </SettingRow>)}
 
       <SettingRow title={t("settings.ai_quota")} description={t("settings.ai_quota_description")}>
         <Input

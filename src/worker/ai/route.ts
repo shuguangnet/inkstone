@@ -5,7 +5,13 @@ import { ApiError } from '../lib/errors'
 import { requireAuth } from '../middleware/auth'
 import { buildChatMessages, type AiAction } from './prompts'
 import { AiGuard, loadQuota, recordUsage } from './quota'
-import { OpenAiCompatProvider, WorkersAiProvider, type AiProvider } from './provider'
+import {
+  OpenAiCompatProvider,
+  parseModelsResponse,
+  WORKERS_AI_CHAT_MODELS,
+  WorkersAiProvider,
+  type AiProvider,
+} from './provider'
 import { loadAiApiKey, loadAiSettings, saveAiSettings, type SaveAiSettingsInput } from './settings'
 
 const ACTIONS: readonly AiAction[] = [
@@ -57,6 +63,33 @@ aiRoutes.get('/status', async (c) => {
     },
     usage: { usedChars: quota.usedChars, quotaChars: quota.quotaChars },
   })
+})
+
+aiRoutes.get('/models', async (c) => {
+  const userId = c.get('userId')
+  const settings = await loadAiSettings(c.env.DB, userId)
+  if (settings.provider === 'workers_ai') {
+    return c.json({ models: WORKERS_AI_CHAT_MODELS, source: 'curated' })
+  }
+  const apiKey = await loadAiApiKey(c.env, userId)
+  if (!apiKey || settings.baseUrl === '') {
+    throw new ApiError(409, 'ai_not_configured', 'Save an endpoint and API key first')
+  }
+  let response: Response
+  try {
+    response = await fetch(`${settings.baseUrl.replace(/\/+$/, '')}/models`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    })
+  } catch {
+    throw new ApiError(502, 'ai_unavailable', 'Could not reach the model endpoint')
+  }
+  if (!response.ok) {
+    throw new ApiError(502, 'ai_unavailable', `The endpoint returned ${response.status}`)
+  }
+  const payload: unknown = await response.json().catch(() => null)
+  const models = parseModelsResponse(payload)
+  if (models.length === 0) throw new ApiError(502, 'ai_unavailable', 'The endpoint returned no models')
+  return c.json({ models, source: 'endpoint' })
 })
 
 aiRoutes.put('/settings', async (c) => {
