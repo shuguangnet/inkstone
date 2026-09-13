@@ -49,6 +49,7 @@ import { broadcastCursor, scheduleFtsDrain } from '../lib/notify'
 import { assertContentSize, FORM_BODY_LIMITS, readFormDataWithinLimit } from '../lib/request'
 import { readZip, type UnzippedEntry } from '@shared/zip'
 import { parseEvernoteEnex } from '../lib/external-import'
+import { threeWayMerge } from '../lib/three-way-merge'
 import {
   buildObsidianAssetIndex,
   collectObsidianReferences,
@@ -63,8 +64,8 @@ import { requireAuth } from '../middleware/auth'
 export const transferRoutes = new Hono<AppBindings>()
 const EXPORT_FILE = 'inkstone-export.json'
 const EXPORT_FORMAT = 'inkstone-export'
-type ImportConflict = 'skip' | 'newer' | 'duplicate'
-const IMPORT_CONFLICTS = new Set<ImportConflict>(['skip', 'newer', 'duplicate'])
+type ImportConflict = 'skip' | 'newer' | 'duplicate' | 'merge'
+const IMPORT_CONFLICTS = new Set<ImportConflict>(['skip', 'newer', 'duplicate', 'merge'])
 const MAX_IMPORT_WARNINGS = 100
 
 transferRoutes.use('/export', requireAuth)
@@ -343,7 +344,7 @@ export async function importBackupZipBytes(
   c: Context<AppBindings>,
   userId: string,
   bytes: Uint8Array,
-  conflict: 'skip' | 'newer' | 'duplicate',
+  conflict: ImportConflict,
   ftsEnabled: boolean,
 ): Promise<ImportResult> {
   const result: ImportResult = {
@@ -639,6 +640,28 @@ async function importBackupMarkdown(
       await insertNote(c, userId, { ...input, id: undefined, title: `${entry.title} (imported)` }, ctx)
       ctx.result.createdNotes++
       return
+    }
+    if (ctx.conflict === 'merge') {
+      const current = await c.env.DB.prepare(
+        'SELECT content, rev, updated_at FROM notes WHERE id = ?1 AND user_id = ?2',
+      ).bind(existing.id, userId).first<{ content: string; rev: number; updated_at: number }>()
+      const base = current === null ? null : await c.env.DB.prepare(
+        'SELECT content FROM note_versions WHERE note_id = ?1 AND user_id = ?2 ORDER BY created_at DESC LIMIT 1',
+      ).bind(existing.id, userId).first<{ content: string }>()
+      if (current !== null && base !== null) {
+        const merged = threeWayMerge(base.content, current.content, content)
+        input.content = merged.content
+        // A merge always writes: force the imported timestamp past the local one.
+        input.updatedAt = Math.max(effectiveUpdatedAt, current.updated_at + 1)
+        const outcome = await updateImportedNote(c, userId, existing, input, input.updatedAt, ctx)
+        if (outcome === 'updated') ctx.result.updatedNotes++
+        else ctx.result.skippedNotes++
+        if (merged.conflicts > 0) {
+          addWarning(ctx.result, `${entry.title}: merged with ${merged.conflicts} conflict region(s) needing manual review`)
+        }
+        return
+      }
+      // No base version to merge against: fall through to newer semantics.
     }
     const outcome = await updateImportedNote(
       c,
@@ -1902,7 +1925,7 @@ function isImportConflict(value: unknown): value is ImportConflict {
 export function parseImportConflict(value: unknown): ImportConflict {
   if (value === null || value === undefined) return 'newer'
   if (isImportConflict(value)) return value
-  throw ApiError.badRequest('conflict must be skip, newer, or duplicate')
+  throw ApiError.badRequest('conflict must be skip, newer, duplicate, or merge')
 }
 
 export function importedBundleTitle(title: unknown, content: string): string {

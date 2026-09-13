@@ -181,7 +181,7 @@ backupRoutes.post('/test', async (c) => {
  * restores it through the standard import path. */
 backupRoutes.post('/restore', async (c) => {
   const userId = c.get('userId')
-  const body = await readJson<{ targetId?: unknown; stamp?: unknown }>(c, JSON_BODY_LIMITS.small)
+  const body = await readJson<{ targetId?: unknown; stamp?: unknown; merge?: unknown }>(c, JSON_BODY_LIMITS.small)
   if (typeof body?.targetId !== 'string' || !isValidId(body.targetId)) {
     throw ApiError.badRequest('Missing targetId')
   }
@@ -215,7 +215,7 @@ backupRoutes.post('/restore', async (c) => {
     : null
   const decrypted = await decryptArchiveBytes(bytes, archivePassphrase)
   const { ftsEnabled } = c.get('database')
-  const result = await importBackupZipBytes(c, userId, decrypted, 'newer', ftsEnabled)
+  const result = await importBackupZipBytes(c, userId, decrypted, body.merge === true ? 'merge' : 'newer', ftsEnabled)
   return c.json({ restored: true, stamp, result })
 })
 
