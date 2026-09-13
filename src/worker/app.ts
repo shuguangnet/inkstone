@@ -17,6 +17,7 @@ import { shareManageRoutes, sharePageRoutes, shareRoutes } from './routes/share'
 import { transferRoutes } from './routes/transfer'
 import { updateRoutes } from './routes/update'
 import { mcpAuthorizeRoutes } from './routes/mcp-authorize'
+import { aiRoutes } from './ai/route'
 import { mcpSettingsRoutes } from './routes/mcp-settings'
 import type { AppBindings } from './env'
 import { selectAttachmentStorage } from './attachments/backend'
@@ -66,6 +67,8 @@ export function createApp() {
   app.use('/api/*', requireClientHeader)
   app.use('/api/*', loadSession)
   app.use('/authorize', loadSession)
+
+  app.route('/api/ai', aiRoutes)
 
   app.get('/api/health', async (c) => {
     const database = c.get('database')
