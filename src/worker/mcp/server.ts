@@ -10,9 +10,13 @@ import {
   listMcpNotes,
   listMcpTags,
   readMcpNote,
+  loadMcpNote,
   searchMcpNotes,
 } from './retrieval'
 import { getMcpPreferences, MCP_SCOPES } from './settings'
+import { buildChatMessages } from '../ai/prompts'
+import { loadAiSettings } from '../ai/settings'
+import { resolveProvider } from '../ai/route'
 import {
   bulkOrganizeMcpNotes,
   createMcpFolder,
@@ -134,6 +138,93 @@ export function createInkstoneMcpServer(options: InkstoneMcpServerOptions): McpS
     async ({ id }, ctx) => safeTool(async () => {
       requireScope(ctx, options.auth, MCP_SCOPES.read)
       return structured(await fetchMcpNote(options.env.DB, options.auth.userId, options.origin, id))
+    }),
+  )
+
+  async function runAi(action: 'polish' | 'summarize' | 'ask', input: {
+    noteId?: string
+    query?: string
+  }): Promise<string> {
+    const settings = await loadAiSettings(options.env.DB, options.auth.userId)
+    if (!settings.enabled) throw new Error('ai_not_configured')
+    const provider = await resolveProvider(options.env, options.auth.userId, settings)
+    let noteContent: string | undefined
+    let noteTitle: string | undefined
+    let context: { title: string; snippet: string }[] | undefined
+    let userMessage: string | undefined
+    if (input.noteId !== undefined) {
+      const note = await loadMcpNote(options.env.DB, options.auth.userId, input.noteId)
+      noteContent = note.content
+      noteTitle = note.title
+    }
+    if (action === 'ask' && input.query !== undefined) {
+      const found = await searchMcpNotes(
+        options.env, options.auth.userId, options.origin, options.ftsEnabled,
+        { query: input.query, limit: 6, mode: 'auto' },
+      )
+      context = found.results.map((hit) => ({ title: hit.title, snippet: hit.snippet }))
+      userMessage = input.query
+    }
+    const messages = buildChatMessages({
+      action: action === 'summarize' ? 'summarize' : action === 'ask' ? 'ask' : 'polish',
+      noteTitle,
+      noteContent,
+      context,
+      userMessage,
+    })
+    let output = ''
+    for await (const delta of provider.stream({ messages, maxTokens: 1_500 })) {
+      output += delta
+      if (output.length > 20_000) break
+    }
+    return output
+  }
+
+  server.registerTool(
+    'polish_note',
+    {
+      title: 'Polish note (AI)',
+      description: 'Rewrite one of your notes with the configured AI provider for clarity while preserving Markdown structure. Read-only: returns the polished text, does not modify the note.',
+      inputSchema: z.object({ note_id: noteId }),
+      outputSchema: z.object({ polished: z.string() }),
+      annotations: readOnlyAnnotations(),
+    },
+    async ({ note_id }, ctx) => safeTool(async () => {
+      requireScope(ctx, options.auth, MCP_SCOPES.read)
+      const polished = await runAi('polish', { noteId: note_id })
+      return structured({ polished })
+    }),
+  )
+
+  server.registerTool(
+    'summarize_note',
+    {
+      title: 'Summarize note (AI)',
+      description: 'Summarize one of your notes with the configured AI provider. Read-only.',
+      inputSchema: z.object({ note_id: noteId }),
+      outputSchema: z.object({ summary: z.string() }),
+      annotations: readOnlyAnnotations(),
+    },
+    async ({ note_id }, ctx) => safeTool(async () => {
+      requireScope(ctx, options.auth, MCP_SCOPES.read)
+      const summary = await runAi('summarize', { noteId: note_id })
+      return structured({ summary })
+    }),
+  )
+
+  server.registerTool(
+    'ask_notes',
+    {
+      title: 'Ask notes (AI)',
+      description: 'Answer a question from your private notes with citations, using retrieval plus the configured AI provider. Read-only.',
+      inputSchema: z.object({ query: z.string().trim().min(1).max(512) }),
+      outputSchema: z.object({ answer: z.string() }),
+      annotations: readOnlyAnnotations(),
+    },
+    async ({ query }, ctx) => safeTool(async () => {
+      requireScope(ctx, options.auth, MCP_SCOPES.read)
+      const answer = await runAi('ask', { query })
+      return structured({ answer })
     }),
   )
 

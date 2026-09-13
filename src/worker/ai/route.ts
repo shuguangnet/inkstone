@@ -207,7 +207,7 @@ function aiAvailable(env: AppBindings['Bindings'], settings: {
   return settings.hasKey && settings.baseUrl !== '' && settings.model !== ''
 }
 
-async function resolveProvider(
+export async function resolveProvider(
   env: AppBindings['Bindings'],
   userId: string,
   settings: Awaited<ReturnType<typeof loadAiSettings>>,

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Archive, ArrowDown, ArrowUp, CalendarDays, CheckSquare, ChevronRight, Clock, CornerUpLeft, FilePlus2, FileText, FolderClosed, FolderInput, FolderOpen, FolderPlus, Hash, Inbox, LogOut, Moon, MoreHorizontal, Palette, PanelLeft, PanelLeftClose, Pencil, Plus, Settings, Star, Sun, Trash2, Waypoints, } from 'lucide-react';
 import { LIMITS } from '@shared/constants';
+import { TemplateMenu } from '../templates/TemplateMenu';
 import type { Tag, ViewKind } from '@shared/types';
 import { compareTagNames } from '@shared/markdown-utils';
 import { cn } from '../../lib/cn';
@@ -39,7 +40,10 @@ export function Sidebar({ collapsed = false, onCollapse, }: {
           </Tooltip>)}
       </header>
 
-      <div className="shrink-0 px-2 pt-2"><SearchButton /></div>
+      <div className="flex shrink-0 items-center gap-1.5 px-2 pt-2">
+        <div className="min-w-0 flex-1"><SearchButton /></div>
+        <TemplateMenu />
+      </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-2 pb-4">
         <div className="space-y-px">
@@ -88,6 +92,7 @@ function SidebarRail({ onExpand }: {
         <RailButton label={t("navigation.trash")} active={view === 'trash'} icon={<Trash2 size={16}/>} onClick={() => openView('trash')}/>
         <div className="my-1 h-px w-6 bg-[var(--border-subtle)]"/>
         <RailButton label={t("common.new_note")} combo="mod+n" accent icon={<FilePlus2 size={16}/>} onClick={() => void createContextualNote()}/>
+        <TemplateMenu rail/>
       </div>
 
       <span className="flex-1"/>
