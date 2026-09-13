@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import {
   backupCompletePath,
   backupManifestPath,
@@ -336,6 +336,67 @@ transferRoutes.post('/import', async (c) => {
   return c.json(result)
 })
 
+
+/** Restores a complete Inkstone Markdown backup ZIP (bytes) using the
+ * standard import path. Used by the backup-pull restore route. */
+export async function importBackupZipBytes(
+  c: Context<AppBindings>,
+  userId: string,
+  bytes: Uint8Array,
+  conflict: 'skip' | 'newer' | 'duplicate',
+  ftsEnabled: boolean,
+): Promise<ImportResult> {
+  const result: ImportResult = {
+    createdNotes: 0,
+    updatedNotes: 0,
+    skippedNotes: 0,
+    createdFolders: 0,
+    createdAttachments: 0,
+    skippedAttachments: 0,
+    warnings: [],
+  }
+  const byId = new Map<string, ExistingNoteIndex | null>()
+  const folderCache = new Map<string, string>()
+  await primeFolderCache(c.env.DB, userId, folderCache)
+  const zipOptions = {
+    maxEntries: LIMITS.importArchiveEntriesMax,
+    maxEntryBytes: LIMITS.importArchiveExpandedMaxBytes,
+    maxTotalBytes: LIMITS.importArchiveExpandedMaxBytes,
+  }
+  const controls = await readZip(bytes, {
+    ...zipOptions,
+    maxEntryBytes: LIMITS.importUploadMaxBytes,
+    maxTotalBytes: LIMITS.importUploadMaxBytes + 1024,
+    include: isBackupControlPath,
+  })
+  const backup = await selectCompleteZipBackup(controls)
+  if (!backup) throw new Error('The remote archive is not a complete Inkstone backup')
+  if (backup.warning) addWarning(result, backup.warning)
+  const expected = new Set(
+    [...backup.manifest.notes, ...backup.manifest.attachments]
+      .map((entry) => `${backup.rootPrefix}${entry.path}`.toLowerCase()),
+  )
+  const entries = await readZip(bytes, {
+    ...zipOptions,
+    maxEntryBytes: LIMITS.importUploadMaxBytes,
+    include: (path) => expected.has(path.toLowerCase()),
+  })
+  if (entries.length !== expected.size) throw new Error('The remote backup ZIP is missing one or more files')
+  await importBackupFileBatch(
+    c,
+    userId,
+    entries.map((entry) => ({
+      file: new File([entry.data], entry.path.split('/').at(-1) ?? 'file'),
+      path: entry.path.slice(backup.rootPrefix.length),
+    })),
+    backup.manifest,
+    { conflict, byId, folderCache, result, ftsEnabled },
+  )
+  await pruneOrphanTags(c.env.DB, userId)
+  await broadcastCursor(c)
+  scheduleFtsDrain(c, 20)
+  return result
+}
 
 interface ImportContext {
   conflict?: ImportConflict

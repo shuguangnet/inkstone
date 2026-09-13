@@ -475,6 +475,12 @@ export const api = {
       request<TestConnectionResult>('/api/backup/test', { method: 'POST', body }),
     run: (targetIds?: string[]) => request<BackupRun>('/api/backup/run', { method: 'POST', body: { targetIds } }),
     runs: () => request<{ runs: BackupRun[] }>('/api/backup/runs'),
+    restore: (targetId: string, stamp?: string) =>
+      request<{ restored: true; stamp: string; result: ImportResult }>('/api/backup/restore', {
+        method: 'POST',
+        body: { targetId, ...(stamp === undefined ? {} : { stamp }) },
+        timeoutMs: 120_000,
+      }),
   },
 
   settings: {

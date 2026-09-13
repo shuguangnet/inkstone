@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, CloudUpload, ExternalLink, HardDrive, Loader2, MoreHorizontal, Plus, Server, Trash2, Zap, } from 'lucide-react';
+import { AlertCircle, CheckCircle2, CloudUpload, Download, ExternalLink, HardDrive, Loader2, MoreHorizontal, Plus, Server, Trash2, Zap, } from 'lucide-react';
 import type { BackupRun, BackupSchedule, BackupTarget, BackupTargetInput, BackupTargetType, TestConnectionResult, } from '@shared/types';
 import { cn } from '../../lib/cn';
+import { useUi } from '../../store/ui';
 import { api, ApiError } from '../../lib/api';
 import { formatBytes, formatDuration } from '../../lib/time';
 import { useRelativeTime } from '../../lib/hooks';
@@ -12,7 +13,6 @@ import { Empty } from '../../components/feedback';
 import { SettingsLoading as LoadingBlock } from './SettingsLoading';
 import { getBackupPresets, type BackupPreset } from './backupPresets';
 import { useSession } from '../../store/session';
-import { useUi } from '../../store/ui';
 import { t, translateServiceMessage } from "../../lib/i18n";
 import { useSettingsResource } from './resource';
 import { backupTargetsResource, backupRunsResource } from './resources';
@@ -54,6 +54,24 @@ export function BackupSettings() {
             reloadEpoch.current++;
         };
     }, [reload]);
+    const [restoring, setRestoring] = useState(false);
+    const restoreLatest = async () => {
+        const target = targets?.find((item) => item.enabled) ?? targets?.[0];
+        if (target === undefined) return;
+        setRestoring(true);
+        try {
+            const result = await api.backup.restore(target.id);
+            useUi.getState().toast({
+                title: t("settings.restore_done_toast", { value0: String(result.result.createdNotes + result.result.updatedNotes) }),
+                description: result.stamp,
+                tone: 'success',
+            });
+        } catch (error) {
+            useUi.getState().toast({ title: t("settings.restore_failed"), description: error instanceof Error ? error.message : String(error), tone: 'danger' });
+        } finally {
+            setRestoring(false);
+        }
+    };
     const runBackup = async () => {
         if (runningRef.current)
             return;
@@ -120,7 +138,10 @@ export function BackupSettings() {
             </div>
             <p className="mt-1 text-[11.5px] leading-relaxed text-[var(--text-tertiary)]">{t("settings.each_backup_goes_independently_to_every_enabled_target_it_includes_notes")}</p>
           </div>
-          <Button size="sm" variant="primary" icon={running ? undefined : <Zap size={13}/>} loading={running} disabled={!enabled} onClick={() => void runBackup()}>{t("settings.back_up_now")}</Button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Button size="sm" variant="primary" icon={running ? undefined : <Zap size={13}/>} loading={running} disabled={!enabled} onClick={() => void runBackup()}>{t("settings.back_up_now")}</Button>
+            <Button size="sm" icon={restoring ? undefined : <Download size={13}/>} loading={restoring} disabled={!enabled} onClick={() => void restoreLatest()}>{t("settings.restore_latest")}</Button>
+          </div>
         </div>
       </section>
 

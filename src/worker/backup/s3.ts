@@ -24,7 +24,7 @@ export interface S3Secret {
 const S3_MULTIPART_PART_BYTES = 8 * 1024 * 1024
 const S3_MULTIPART_PARTS_MAX = 10_000
 
-function client(secret: S3Secret, config: S3Config): AwsClient {
+export function client(secret: S3Secret, config: S3Config): AwsClient {
   if (!secret.accessKeyId || !secret.secretAccessKey) {
     throw new Error('Access Key or Secret Key is missing')
   }

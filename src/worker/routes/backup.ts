@@ -4,6 +4,10 @@ import { truncateText } from '@shared/text-utils'
 import type { BackupRun, BackupTargetInput, BackupTargetPatchInput, BackupTargetResult } from '@shared/types'
 import type { AppBindings } from '../env'
 import { runBackup, testTarget, toBackupTarget, type TargetRow } from '../backup/engine'
+import { fetchBackupArchive } from '../backup/restore'
+import { importBackupZipBytes } from './transfer'
+import { formatStamp } from '../backup/snapshot'
+import type { BackupTargetConfig } from '@shared/types'
 import {
   BackupConfigError,
   normalizeBackupPrefix,
@@ -171,6 +175,44 @@ backupRoutes.post('/test', async (c) => {
   return c.json(result)
 })
 
+
+/** Pulls the latest (or a specific) backup archive back from a target and
+ * restores it through the standard import path. */
+backupRoutes.post('/restore', async (c) => {
+  const userId = c.get('userId')
+  const body = await readJson<{ targetId?: unknown; stamp?: unknown }>(c, JSON_BODY_LIMITS.small)
+  if (typeof body?.targetId !== 'string' || !isValidId(body.targetId)) {
+    throw ApiError.badRequest('Missing targetId')
+  }
+  const row = await c.env.DB.prepare(
+    'SELECT * FROM backup_targets WHERE id = ?1 AND user_id = ?2',
+  ).bind(body.targetId, userId).first<TargetRow>()
+  if (row === null) throw ApiError.notFound('Backup target not found')
+
+  let stamp: string
+  if (typeof body.stamp === 'string' && /^\d{8}-\d{6}-\d{3}$/.test(body.stamp)) {
+    stamp = body.stamp
+  } else {
+    const run = await c.env.DB.prepare(
+      `SELECT started_at FROM backup_runs
+        WHERE user_id = ?1 AND status = 'success' AND note_count > 0
+        ORDER BY started_at DESC LIMIT 1`,
+    ).bind(userId).first<{ started_at: number }>()
+    if (run === null) throw ApiError.badRequest('No successful backup run exists to restore from')
+    stamp = formatStamp(new Date(run.started_at))
+  }
+
+  const config = JSON.parse(row.config) as BackupTargetConfig
+  const secret = row.secret
+    ? await decryptSecret<{ password?: string; accessKeyId?: string; secretAccessKey?: string }>(c.env, row.id, row.secret)
+    : null
+  if (secret === null) throw new BackupConfigError('The target credentials are unavailable')
+
+  const bytes = await fetchBackupArchive(config, secret, stamp)
+  const { ftsEnabled } = c.get('database')
+  const result = await importBackupZipBytes(c, userId, bytes, 'newer', ftsEnabled)
+  return c.json({ restored: true, stamp, result })
+})
 
 backupRoutes.post('/run', async (c) => {
   await enforceOutboundBudget(c, 'run')
