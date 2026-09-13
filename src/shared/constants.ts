@@ -262,3 +262,6 @@ function numberInRange(value: unknown, min: number, max: number, fallback: numbe
 function integerInRange(value: unknown, min: number, max: number, fallback: number): number {
   return Math.round(numberInRange(value, min, max, fallback))
 }
+
+/** Content prefix marking a client-side encrypted note body. */
+export const ENCRYPTED_NOTE_PREFIX = 'inkstone-enc:v1:'

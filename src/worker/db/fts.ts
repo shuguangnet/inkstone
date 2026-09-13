@@ -1,4 +1,4 @@
-import { LIMITS } from '@shared/constants'
+import { ENCRYPTED_NOTE_PREFIX, LIMITS } from '@shared/constants'
 import { segmentCJK } from '@shared/markdown-utils'
 import { truncateText } from '@shared/text-utils'
 import { selectQueueUsersRoundRobin } from './metadata'
@@ -60,7 +60,9 @@ export async function rebuildFtsIndex(db: D1Database, userId: string): Promise<n
             row.id,
             userId,
             segmentCJK(row.title),
-            segmentCJK(truncateText(row.content, LIMITS.ftsContentChars)),
+            row.content.startsWith(ENCRYPTED_NOTE_PREFIX)
+              ? ''
+              : segmentCJK(truncateText(row.content, LIMITS.ftsContentChars)),
             row.id,
             userId,
             row.rev,
