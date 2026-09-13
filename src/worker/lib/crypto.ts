@@ -47,6 +47,27 @@ export async function decryptTotpSecret(
   return typeof secret === 'string' && /^[A-Z2-7]{32}$/.test(secret) ? secret : null
 }
 
+export async function encryptAiCredential(
+  env: Env,
+  userId: string,
+  apiKey: string,
+): Promise<string> {
+  if (!isValidId(userId)) throw new Error('invalid_ai_credential_scope')
+  return encryptCredential(env, `ai:${userId}`, { apiKey })
+}
+
+export async function decryptAiCredential(
+  env: Env,
+  userId: string,
+  stored: string,
+): Promise<string | null> {
+  if (!isValidId(userId) || stored.length > 24 * 1024) return null
+  const value = await decryptCredential(env, `ai:${userId}`, stored)
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const key = (value as Record<string, unknown>).apiKey
+  return typeof key === 'string' && key !== '' ? key : null
+}
+
 async function encryptCredential(env: Env, scope: string, value: unknown): Promise<string> {
   const response = await vaultRequest(env, '/encrypt', { scope, value })
   if (!response.ok) throw new CryptoUnavailableError()

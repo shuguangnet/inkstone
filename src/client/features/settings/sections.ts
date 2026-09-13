@@ -1,10 +1,11 @@
 import { backupRunsResource, backupTargetsResource, mcpResource, statsResource, totpResource } from './resources'
 import { useSession } from '../../store/session'
 
-export type SettingsSection = 'appearance' | 'editor' | 'backup' | 'sync' | 'mcp' | 'account' | 'data' | 'about'
+export type SettingsSection = 'appearance' | 'editor' | 'ai' | 'backup' | 'sync' | 'mcp' | 'account' | 'data' | 'about'
 
 export const settingsLoaders = {
   editor: () => import('./EditorSettings').then((m) => ({ default: m.EditorSettings })),
+  ai: () => import('./AiSettings').then((m) => ({ default: m.AiSettings })),
   backup: () => import('./BackupSettings').then((m) => ({ default: m.BackupSettings })),
   sync: () => import('./SyncSettings').then((m) => ({ default: m.SyncSettings })),
   mcp: () => import('./McpSettings').then((m) => ({ default: m.McpSettings })),

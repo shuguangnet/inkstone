@@ -297,6 +297,25 @@ export const SCHEMA_STATEMENTS: readonly string[] = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_mcp_api_keys_user
      ON mcp_api_keys(user_id, revoked_at)`,
+
+  `CREATE TABLE IF NOT EXISTS ai_settings (
+    user_id TEXT PRIMARY KEY,
+    enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+    provider TEXT NOT NULL DEFAULT 'workers_ai' CHECK (provider IN ('workers_ai', 'openai_compat')),
+    model TEXT NOT NULL DEFAULT '',
+    base_url TEXT NOT NULL DEFAULT '',
+    credential TEXT,
+    daily_char_quota INTEGER NOT NULL DEFAULT 50000,
+    updated_at INTEGER NOT NULL
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS ai_usage (
+    user_id TEXT NOT NULL,
+    day TEXT NOT NULL,
+    chars INTEGER NOT NULL DEFAULT 0,
+    requests INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, day)
+  )`,
   `CREATE INDEX IF NOT EXISTS idx_mcp_api_keys_revoked
      ON mcp_api_keys(revoked_at)`,
 
@@ -581,6 +600,8 @@ const REQUIRED_TABLES = [
   'mcp_preferences',
   'mcp_operations',
   'mcp_api_keys',
+  'ai_settings',
+  'ai_usage',
   'ai_note_embeddings',
   'ai_index_queue',
   'fts_index_queue',

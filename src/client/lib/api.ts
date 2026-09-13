@@ -264,7 +264,39 @@ function shouldNotifyOtherTabs(path: string): boolean {
 }
 
 
+export interface AiStatusResponse {
+  available: boolean
+  reason: 'disabled' | 'not_configured' | null
+  settings: {
+    enabled: boolean
+    provider: 'workers_ai' | 'openai_compat'
+    model: string
+    baseUrl: string
+    hasKey: boolean
+    dailyCharQuota: number
+  }
+  usage: { usedChars: number; quotaChars: number }
+}
+
+export interface AiSettingsUpdate {
+  enabled?: boolean
+  provider?: 'workers_ai' | 'openai_compat'
+  model?: string
+  baseUrl?: string
+  apiKey?: string
+  dailyCharQuota?: number
+}
+
 export const api = {
+  ai: {
+    status: (signal?: AbortSignal) => request<AiStatusResponse>('/api/ai/status', { signal }),
+    saveSettings: (input: AiSettingsUpdate) =>
+      request<{ ok: true; settings: AiStatusResponse['settings'] }>('/api/ai/settings', {
+        method: 'PUT',
+        body: input,
+      }),
+  },
+
   session: () => request<SessionInfo>('/api/auth/session'),
   logout: () => request<{ ok: true }>('/api/auth/logout', { method: 'POST' }),
 
