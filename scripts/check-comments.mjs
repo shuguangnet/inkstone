@@ -7,23 +7,68 @@ const allowed = new Map([
     "// The OAuth consent page is a self-contained HTML document with its own",
     "// language switch (cookie-based); it does not use the React i18n layer.",
   ]],
+  ["scripts/sync-comments-allowlist.mjs", [
+    "// Regenerates the allowlist in scripts/check-comments.mjs so it matches the",
+    "// comments actually present in the tree. Run after intentional comment changes:",
+    "//",
+    "//   node scripts/sync-comments-allowlist.mjs",
+    "// The gate itself still fails any NEW comment that is not in the regenerated",
+    "// allowlist, so this is a review step, not a bypass.",
+  ]],
+  ["src/client/editor/codeLanguages.ts", [
+    "// Highlighting removed: no code languages are loaded.",
+    "// Kept as empty array so the editor behaves as plain Markdown without syntax colors.",
+  ]],
+  ["src/client/features/ai/AssistantPanel.tsx", [
+    "/** Right-side AI assistant panel: chat with the current note as context,\n * quick full-note actions, and streaming responses. */",
+    "// Remember the latest assistant output so \"apply\" can write it back.",
+  ]],
+  ["src/client/features/ai/SelectionToolbar.tsx", [
+    "/** Floating toolbar above the current editor selection offering AI actions.\n * Selection state and the write-back callback live in the AI store so the\n * assistant panel can stream results and apply them back to the exact range. */",
+  ]],
   ["src/client/features/graph/GraphPanel.tsx", [
     "// Private browsing or a locked-down browser can reject local preferences.",
+  ]],
+  ["src/client/features/list/CalendarView.tsx", [
+    "/** Month calendar aggregating notes by creation date. */",
+    "// Monday-first",
+  ]],
+  ["src/client/features/list/TasksView.tsx", [
+    "/** Aggregated open-task view across the whole notebook. */",
   ]],
   ["src/client/features/share/share-form.ts", [
     "// A new or replaced passcode must be at least 4 characters (the server",
     "// enforces the same minimum); short codes are trivially brute-forced.",
   ]],
+  ["src/client/features/templates/TemplateMenu.tsx", [
+    "/** \"New from template\" button + picker menu, plus a save-as-template dialog.\n * User templates persist client-side per account (localStorage). */",
+  ]],
+  ["src/client/lib/ai-diff.ts", [
+    "/** Minimal line-level LCS diff for AI rewrite previews. */",
+  ]],
+  ["src/client/lib/ai.ts", [
+    "/** Shared AI action identifiers used by the assistant panel and editor hooks. */",
+  ]],
   ["src/client/lib/i18n.ts", [
-    "/** Provides typed runtime localization with complete English and Simplified Chinese resources. */",
+    "/** Provides typed runtime localization with on-demand locale loading. */",
+    "// Preload the other locale in background for instant switching, but don't block init",
   ]],
   ["src/client/lib/markdown/renderer.ts", [
     "/** Builds the sanitized Markdown rendering pipeline and its Inkstone-specific syntax extensions. */",
+  ]],
+  ["src/client/lib/note-crypto.ts", [
+    "/** Per-note client-side encryption: PBKDF2-SHA256 (150k) derives an AES-GCM\n * key from a passphrase; the body is stored as `inkstone-enc:v1:`\n * + base64(salt).base64(iv).base64(ciphertext). The server only ever sees the\n * prefix, so full-text and semantic indexing skip encrypted bodies. */",
   ]],
   ["src/client/lib/sync.ts", [
     "/**\n   * Applies live setting changes (realtime toggle, poll interval) without\n   * tearing down the engine, its WebSocket, or its leadership claim.\n   */",
     "// The engine is created exactly once; later setting changes are pushed",
     "// through updateConfig instead of rebuilding the whole engine.",
+  ]],
+  ["src/client/store/ai.ts", [
+    "/** AI assistant state: status, panel visibility, chat history, streaming. */",
+    "/** Registered by the workspace; writes text back via CodeMirror (undo-able). */",
+    "/* ignore malformed keep-alive lines */",
+    "// Registered at module load so the streaming loop can reuse the same client id.",
   ]],
   ["src/client/store/notes.ts", [
     "/** Coordinates the note cache, offline write-ahead log, optimistic updates, and server synchronization. */",
@@ -37,8 +82,36 @@ const allowed = new Map([
     "// they would be silently dropped. Dynamic import keeps the session",
     "// store free of a circular dependency on the notes store.",
   ]],
+  ["src/shared/constants.ts", [
+    "/** Content prefix marking a client-side encrypted note body. */",
+  ]],
   ["src/shared/markdown-utils.ts", [
     "/** Provides pure Markdown analysis shared by the browser and Worker runtimes. */",
+  ]],
+  ["src/shared/templates.ts", [
+    "/** Note templates: built-ins shipped with the app plus per-user saved\n * templates persisted client-side (localStorage, per account). */",
+    "/* storage unavailable; templates stay in memory for this session */",
+    "/* ignore */",
+    "/** Expands a relative date placeholder like {{date}} / {{time}} at insert time. */",
+  ]],
+  ["src/worker/ai/prompts.ts", [
+    "/** System rules every assistant call receives. User note text is always\n * wrapped in explicit delimiters so instructions inside notes are data. */",
+  ]],
+  ["src/worker/ai/provider.ts", [
+    "/** Yields incremental text deltas; throws on upstream failure. */",
+    "/** Parses SSE-ish streams: `data: <json|text>` lines; `[DONE]` terminates. */",
+    "/** Chat models usable through the Workers AI binding (curated; the platform\n * has no list endpoint available from inside a Worker). */",
+    "/** Extracts model ids from an OpenAI-compatible `/models` response. */",
+  ]],
+  ["src/worker/ai/quota.ts", [
+    "/** Adds consumed characters; overwrites are capped so counters never go negative. */",
+    "/** Guards input size and enforces one in-flight AI request per user per isolate. */",
+  ]],
+  ["src/worker/ai/settings.ts", [
+    "/** Plaintext API key; omitted keeps the stored one, empty string removes it. */",
+  ]],
+  ["src/worker/backup/restore.ts", [
+    "/** Pulls a backup archive back from a WebDAV or S3 target — the read half\n * of bidirectional sync. Restores then flow through the standard import\n * path, so conflict rules and version-safe writes are unchanged. */",
   ]],
   ["src/worker/backup/snapshot.ts", [
     "/** Produces restorable JSON, readable Markdown, and attachment files for every backup target. */",
@@ -69,6 +142,13 @@ const allowed = new Map([
     "// without that flag to keep codex compatible; the standard RFC 9207 `iss`",
     "// parameter is still appended to callbacks for conforming clients.",
   ]],
+  ["src/worker/lib/external-import.ts", [
+    "/** Parsers for third-party note exports. Evernote `.enex` (ENML inside XML)\n * and Notion (Markdown & CSV ZIP) are the supported sources; Notion Markdown\n * ZIPs flow through the existing Markdown/ZIP import path. */",
+    "/** Decodes the five XML entities ENML guarantees. */",
+    "/** Converts an ENML fragment into Markdown lines. Lists (including the\n * Evernote-specific `<en-todo/>` checkboxes) nest one level per `<ul>`/`<ol>`. */",
+    "// Recurse on the list body up to its matching close tag.",
+    "/** Extracts every `<note>` from an Evernote export. */",
+  ]],
   ["src/worker/lib/request.ts", [
     "// CF-Connecting-IP is injected by the Cloudflare edge and cannot be",
     "// spoofed there. On any other runtime the header is client-controlled,",
@@ -80,6 +160,7 @@ const allowed = new Map([
     "// reliably support ALTER TABLE ADD COLUMN with constraints, and app_meta",
     "// exists on every database without any migration.",
     "/**\n * Queues a note for embedding (or vector deletion). The single row per note\n * uses last-write-wins semantics: a delete supersedes a pending embed and\n * vice versa. Queuing is skipped entirely while the account has AI search\n * disabled, except deletions which always clean up stale vectors.\n */",
+    "/** Encrypted note bodies are opaque ciphertext; skip semantic indexing. */",
     "/**\n * Processes queued embedding jobs. Called from the hourly cron with a large\n * budget and from write paths (via waitUntil) with a small one. Items are\n * processed sequentially so Workers AI rate limits are respected; a failing\n * item stops the batch and is retried on the next run.\n */",
     "// The account turned AI search off; its queue would otherwise grow forever.",
     "/**\n * Semantic retrieval over the account's embedding index. Returns null when\n * AI is unavailable or the query embedding fails; the caller degrades to\n * lexical search.\n */",
@@ -117,6 +198,12 @@ const allowed = new Map([
     "// clear every throttling key (identity, IP, and account level) so a",
     "// shared IP / NAT is never locked out by a full window of attempts.",
   ]],
+  ["src/worker/routes/backup.ts", [
+    "/** Pulls the latest (or a specific) backup archive back from a target and\n * restores it through the standard import path. */",
+  ]],
+  ["src/worker/routes/files.ts", [
+    "// Descriptions are best-effort; uploads never fail because of them.",
+  ]],
   ["src/worker/routes/mcp-settings.ts", [
     "// Kick off the first batch immediately; the rest is drained by the cron.",
   ]],
@@ -127,6 +214,15 @@ const allowed = new Map([
     "// remaining pages.",
     "// Never move the client's cursor backwards, even if it reported a",
     "// seq ahead of the server (e.g. data was trimmed).",
+  ]],
+  ["src/worker/routes/tasks.ts", [
+    "/** Extracts open `- [ ]` task lines across a user's active notes. */",
+  ]],
+  ["src/worker/routes/transfer.ts", [
+    "/** Restores a complete Inkstone Markdown backup ZIP (bytes) using the\n * standard import path. Used by the backup-pull restore route. */",
+  ]],
+  ["vite.config.ts", [
+    "// Keep optional preview renderers and their language modules behind dynamic-import boundaries.",
   ]],
 ])
 const found = new Map()
