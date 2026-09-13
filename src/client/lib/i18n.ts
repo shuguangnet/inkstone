@@ -111,7 +111,12 @@ export function translateServiceMessage(message: string | null | undefined): str
     if (match)
         return t('backup.service.cleanup_failed', { status: match[1] });
     const http = /HTTP\s+\d{3}/i.exec(message)?.[0];
-    return `${t('backup.error.storage_service')}${http ? ` (${http})` : ''}`;
+    // Only route genuine storage errors to the backup message; unknown
+    // messages are shown verbatim instead of a misleading fallback.
+    if (/webdav|s3|bucket|storage/i.test(message)) {
+      return `${t('backup.error.storage_service')}${http ? ` (${http})` : ''}`;
+    }
+    return message;
 }
 export function getLocale(): AppLocale {
     return locale;

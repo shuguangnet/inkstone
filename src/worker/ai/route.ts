@@ -103,13 +103,13 @@ aiRoutes.put('/settings', async (c) => {
     return c.json({ ok: true, settings: { ...settings } })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'ai_settings_invalid'
-    if (message === 'ai_openai_compat_requires_endpoint') {
-      throw ApiError.badRequest('OpenAI-compatible providers need an endpoint')
+    if (message === 'ai_base_url_invalid') {
+      throw ApiError.badRequest('The endpoint must start with http:// or https://')
     }
-    if (message === 'ai_openai_compat_requires_model') {
-      throw ApiError.badRequest('OpenAI-compatible providers need a model')
+    if (message === 'ai_key_too_long') {
+      throw ApiError.badRequest('The API key is too long')
     }
-    throw ApiError.badRequest('Invalid AI settings payload')
+    throw ApiError.badRequest(`AI settings are invalid: ${message}`)
   }
 })
 

@@ -80,13 +80,11 @@ export async function saveAiSettings(
     5_000_000,
   ))
   const enabled = input.enabled ?? current.enabled
-  // Local runtimes (e.g. Ollama) expose OpenAI-compatible endpoints without
-  // any key; only the endpoint and model are mandatory.
-  if (provider === 'openai_compat' && enabled && !baseUrl) {
-    throw new Error('ai_openai_compat_requires_endpoint')
-  }
-  if (provider === 'openai_compat' && enabled && !model) {
-    throw new Error('ai_openai_compat_requires_model')
+  // Completeness (endpoint/model present) is enforced at chat time via the
+  // availability check, so users can save a draft configuration without the
+  // UI rejecting intermediate states (e.g. right after switching provider).
+  if (baseUrl !== '' && !/^https?:\/\//i.test(baseUrl)) {
+    throw new Error('ai_base_url_invalid')
   }
   await env.DB.prepare(
     `INSERT INTO ai_settings

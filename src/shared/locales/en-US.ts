@@ -691,6 +691,8 @@ export const EN_US_MESSAGES = {
     "share.blog_empty": "No posts published yet",
     "share.back_to_blog": "Back to {title}",
     "share.wiki_note": "Wiki pages",
+    "settings.ai_error_need_endpoint": "OpenAI-compatible providers need an endpoint — fill in Base URL first",
+    "settings.ai_error_url_invalid": "The endpoint must start with http:// or https://",
     "ai.panel.title": "AI Assistant",
     "ai.panel.stop": "Stop generating",
     "ai.panel.not_configured": "AI assistant is not configured yet. Enable it in Settings → AI.",

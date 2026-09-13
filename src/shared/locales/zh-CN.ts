@@ -692,6 +692,8 @@ export const ZH_CN_MESSAGES = {
     "share.blog_empty": "还没有发布文章",
     "share.back_to_blog": "返回 {title}",
     "share.wiki_note": "Wiki 页面",
+    "settings.ai_error_need_endpoint": "OpenAI 兼容提供商需要先填写 Base URL",
+    "settings.ai_error_url_invalid": "端点必须以 http:// 或 https:// 开头",
     "ai.panel.title": "AI 助手",
     "ai.panel.stop": "停止生成",
     "ai.panel.not_configured": "AI 助手尚未配置。请在 设置 → AI 中开启。",
