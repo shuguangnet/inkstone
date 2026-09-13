@@ -429,6 +429,7 @@ export interface BackupTargetInput {
     password?: string
     accessKeyId?: string
     secretAccessKey?: string
+    backupPassphrase?: string
   }
 }
 

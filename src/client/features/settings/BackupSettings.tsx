@@ -338,7 +338,7 @@ function TargetForm({ target, onClose, onSaved, }: {
         url: String(config.url ?? ''),
         username: String(config.username ?? ''),
     });
-    const [secret, setSecret] = useState({ accessKeyId: '', secretAccessKey: '', password: '' });
+    const [secret, setSecret] = useState({ accessKeyId: '', secretAccessKey: '', password: '', backupPassphrase: '' });
     const [saving, setSaving] = useState(false);
     const [testing, setTesting] = useState(false);
     const [result, setResult] = useState<TestConnectionResult | null>(null);
@@ -385,9 +385,12 @@ function TargetForm({ target, onClose, onSaved, }: {
                 mode: 'archive',
             }
             : { url: form.url, username: form.username, prefix: form.prefix, mode: 'archive' },
-        secret: type === 's3'
-            ? { accessKeyId: secret.accessKeyId, secretAccessKey: secret.secretAccessKey }
-            : { password: secret.password },
+        secret: {
+            ...(type === 's3'
+                ? { accessKeyId: secret.accessKeyId, secretAccessKey: secret.secretAccessKey }
+                : { password: secret.password }),
+            ...(secret.backupPassphrase === '' ? {} : { backupPassphrase: secret.backupPassphrase }),
+        },
     });
     const save = async () => {
         if (actionRef.current)
@@ -538,6 +541,9 @@ function TargetForm({ target, onClose, onSaved, }: {
               </Field>
               <Field label={t("common.password")} required={!canKeepSecret} hint={t("settings.use_an_app_specific_password_when_possible")}>
                 <Input type="password" value={secret.password} onChange={(e) => setSecret({ ...secret, password: e.target.value })} placeholder={canKeepSecret ? t("settings.unchanged") : ''} autoComplete="new-password"/>
+                <Field label={t("settings.backup_passphrase")}>
+                <Input type="password" value={secret.backupPassphrase} onChange={(e) => setSecret({ ...secret, backupPassphrase: e.target.value })} placeholder={t("settings.backup_passphrase_hint")} autoComplete="new-password"/>
+                </Field>
               </Field>
             </div>
           </>)}

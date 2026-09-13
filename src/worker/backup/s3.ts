@@ -2,7 +2,7 @@ import { AwsClient } from 'aws4fetch'
 import { truncateText } from '@shared/text-utils'
 import type { S3Config, TestConnectionResult } from '@shared/types'
 import type { Snapshot } from './snapshot'
-import { backupArchivePath, createBackupArchive } from './archive'
+import { createBackupArchive, type BackupArchive } from './archive'
 import {
   BACKUP_USER_AGENT,
   friendlyError,
@@ -71,18 +71,27 @@ export async function s3Deliver(
   snapshot: Snapshot,
   signal?: AbortSignal,
 ): Promise<DeliverResult> {
+  return s3DeliverArchive(config, secret, createBackupArchive(snapshot), snapshot.stamp, signal)
+}
+
+export async function s3DeliverArchive(
+  config: S3Config,
+  secret: S3Secret,
+  archive: BackupArchive,
+  stamp: string,
+  signal?: AbortSignal,
+): Promise<DeliverResult> {
   const aws = client(secret, config)
   const prefix = normalizeBackupPrefix(config.prefix ?? '')
-  const key = joinKey(prefix, backupArchivePath(snapshot))
-  const archive = createBackupArchive(snapshot)
-  if (await s3ArchiveMatches(aws, config, key, archive.byteLengthNumber, snapshot.stamp, signal)) {
+  const key = joinKey(prefix, `backups/${archive.filename}`)
+  if (await s3ArchiveMatches(aws, config, key, archive.byteLengthNumber, stamp, signal)) {
     await archive.stream.cancel().catch(() => {})
     return { files: 1, bytes: archive.byteLengthNumber }
   }
 
   if (archive.byteLengthNumber <= S3_MULTIPART_PART_BYTES) {
     const body = await readStreamExactly(archive.stream, archive.byteLengthNumber)
-    await putArchive(aws, config, key, body, snapshot.stamp, signal)
+    await putArchive(aws, config, key, body, stamp, signal)
   } else {
     await multipartUpload(
       aws,
@@ -90,7 +99,7 @@ export async function s3Deliver(
       key,
       archive.stream,
       archive.byteLengthNumber,
-      snapshot.stamp,
+      stamp,
       signal,
     )
   }
