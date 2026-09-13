@@ -2,6 +2,7 @@ import type { MessageKey } from '@shared/locales/en-US'
 
 /** Shared AI action identifiers used by the assistant panel and editor hooks. */
 export type AiAction = 
+  | 'ask'
   | 'chat'
   | 'polish'
   | 'expand'

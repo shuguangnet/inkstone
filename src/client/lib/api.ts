@@ -287,7 +287,16 @@ export interface AiSettingsUpdate {
   dailyCharQuota?: number
 }
 
+export interface AggregatedTask {
+  noteId: string
+  noteTitle: string
+  text: string
+  line: number
+}
+
 export const api = {
+  tasks: (signal?: AbortSignal) =>
+    request<{ tasks: AggregatedTask[] }>('/api/tasks', { signal }),
   ai: {
     status: (signal?: AbortSignal) => request<AiStatusResponse>('/api/ai/status', { signal }),
     models: (signal?: AbortSignal) =>

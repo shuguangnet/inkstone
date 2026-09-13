@@ -19,6 +19,8 @@ import { t, useLocale, type MessageKey } from "../../lib/i18n";
 const VIEW_MESSAGE_KEYS: Record<ViewKind, MessageKey> = {
     all: 'navigation.all_notes',
     recent: 'navigation.recently_edited',
+    tasks: 'navigation.tasks',
+    calendar: 'navigation.calendar',
     starred: 'navigation.favorites',
     unfiled: 'navigation.unfiled',
     archived: 'navigation.archive',

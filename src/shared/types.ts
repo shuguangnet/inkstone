@@ -224,6 +224,8 @@ export interface AttachmentWithUsage extends Attachment {
 export type ViewKind =
   | 'all'
   | 'recent'
+  | 'tasks'
+  | 'calendar'
   | 'starred'
   | 'unfiled'
   | 'archived'
