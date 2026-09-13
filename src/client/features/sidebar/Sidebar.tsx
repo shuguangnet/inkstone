@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, ArrowDown, ArrowUp, CalendarDays, CheckSquare, ChevronRight, Clock, CornerUpLeft, FilePlus2, FileText, FolderClosed, FolderInput, FolderOpen, FolderPlus, Hash, Inbox, LogOut, Moon, MoreHorizontal, Palette, PanelLeft, PanelLeftClose, Pencil, Plus, Settings, Star, Sun, Trash2, Waypoints, } from 'lucide-react';
+import { Archive, ArrowDown, ArrowUp, CalendarDays, CheckSquare, ChevronRight, Clock, CornerUpLeft, FilePlus2, FileText, FolderClosed, FolderInput, FolderOpen, FolderPlus, Globe, Hash, Inbox, LogOut, Moon, MoreHorizontal, Palette, PanelLeft, PanelLeftClose, Pencil, Plus, Settings, Star, Sun, Trash2, Waypoints, } from 'lucide-react';
 import { LIMITS } from '@shared/constants';
 import { TemplateMenu } from '../templates/TemplateMenu';
+import { api } from '../../lib/api';
 import type { Tag, ViewKind } from '@shared/types';
 import { compareTagNames } from '@shared/markdown-utils';
 import { cn } from '../../lib/cn';
@@ -481,11 +482,21 @@ function FolderRow({ node, siblings, index, parentNode, parentSiblings, onCreate
             return;
         void onMove(node.id, parentNode.parentId, parentSiblings[parentIndex + 1]?.id ?? null);
     };
+    const publishBlog = async (folderId: string) => {
+        try {
+            const result = await api.share.createBlog(folderId);
+            useUi.getState().toast({ title: t("folders.blog_published_toast"), description: result.url, tone: 'success' });
+            void navigator.clipboard?.writeText(result.url).catch(() => undefined);
+        } catch (error) {
+            useUi.getState().toast({ title: t("folders.blog_publish_failed"), description: error instanceof Error ? error.message : String(error), tone: 'danger' });
+        }
+    };
     const menuItems: MenuItem[] = [
         { id: 'rename', label: t("sidebar.rename"), onSelect: () => onStartRename(node.id) },
         { id: 'new-note', label: t("sidebar.create_new_note_here"), icon: <FilePlus2 size={13}/>, onSelect: () => void useNotes.getState().createNote({ folderId: node.id }) },
         { id: 'new-child', label: t("sidebar.new_subfolder"), icon: <FolderPlus size={13}/>, disabled: !canCreateChild, onSelect: () => onCreateChild(node.id) },
         { id: 'appearance', label: t("folders.appearance"), icon: <Palette size={13}/>, onSelect: () => onEditAppearance(node.id) },
+        { id: 'publish-blog', label: t("folders.publish_as_blog"), icon: <Globe size={13}/>, onSelect: () => void publishBlog(node.id) },
         { id: 'move-to', label: t("folders.move_to"), icon: <FolderInput size={13}/>, separatorBefore: true, onSelect: () => onChooseParent(node.id) },
         { id: 'move-earlier', label: t("sidebar.move_earlier"), icon: <ArrowUp size={13}/>, disabled: index === 0, onSelect: moveEarlier },
         { id: 'move-later', label: t("sidebar.move_later"), icon: <ArrowDown size={13}/>, disabled: index === siblings.length - 1, onSelect: moveLater },

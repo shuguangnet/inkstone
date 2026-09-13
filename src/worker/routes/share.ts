@@ -52,6 +52,64 @@ function toShareInfo(row: ShareRow, origin: string): ShareInfo {
 
 shareManageRoutes.use('*', requireAuth)
 
+shareManageRoutes.post('/blog', async (c) => {
+  const userId = c.get('userId')
+  const body = await readJson<{ folderId?: unknown }>(c, JSON_BODY_LIMITS.small)
+  if (typeof body?.folderId !== 'string' || body.folderId === '') {
+    throw ApiError.badRequest('Missing folderId')
+  }
+  const folder = await c.env.DB.prepare(
+    'SELECT id, name FROM folders WHERE id = ?1 AND user_id = ?2 AND deleted_at IS NULL',
+  ).bind(body.folderId, userId).first<{ id: string; name: string }>()
+  if (folder === null) throw ApiError.notFound('Folder not found')
+
+  const noteRows = await c.env.DB.prepare(
+    `SELECT id, title FROM notes
+      WHERE user_id = ?1 AND folder_id = ?2 AND deleted_at IS NULL AND is_archived = 0
+      ORDER BY updated_at DESC`,
+  ).bind(userId, folder.id).all<{ id: string; title: string }>()
+  const notes = noteRows.results ?? []
+  if (notes.length === 0) throw ApiError.badRequest('The folder has no publishable notes')
+
+  const now = Date.now()
+  const slugs: Array<{ slug: string; title: string }> = []
+  for (const note of notes) {
+    let slugRow = await c.env.DB.prepare(
+      'SELECT slug FROM shares WHERE note_id = ?1 AND user_id = ?2',
+    ).bind(note.id, userId).first<{ slug: string }>()
+    if (slugRow === null) {
+      const slug = newSlug()
+      await c.env.DB.prepare(
+        `INSERT INTO shares (slug, note_id, user_id, password_hash, expires_at, views, created_at)
+         VALUES (?1, ?2, ?3, NULL, NULL, 0, ?4)`,
+      ).bind(slug, note.id, userId, now).run()
+      slugRow = { slug }
+    }
+    slugs.push({ slug: slugRow.slug, title: note.title })
+  }
+
+  const slug = newSlug()
+  await c.env.DB.prepare(
+    `INSERT INTO blog_collections (slug, user_id, folder_id, title, created_at, updated_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+  ).bind(slug, userId, folder.id, folder.name, now, now).run()
+  await c.env.DB.prepare(
+    'DELETE FROM blog_collections WHERE folder_id = ?1 AND user_id = ?2 AND slug <> ?3',
+  ).bind(folder.id, userId, slug).run()
+
+  return c.json({ slug, url: `${new URL(c.req.url).origin}/s/blog/${slug}`, title: folder.name, notes: slugs.length })
+})
+
+shareManageRoutes.delete('/blog/:slug', async (c) => {
+  const userId = c.get('userId')
+  const slug = c.req.param('slug')
+  if (!isValidSlug(slug)) throw ApiError.badRequest('Invalid blog slug')
+  await c.env.DB.prepare(
+    'DELETE FROM blog_collections WHERE slug = ?1 AND user_id = ?2',
+  ).bind(slug, userId).run()
+  return c.json({ ok: true })
+})
+
 shareManageRoutes.get('/:noteId', async (c) => {
   const row = await c.env.DB.prepare(
     `SELECT * FROM shares WHERE note_id = ?1 AND user_id = ?2`,
@@ -243,6 +301,38 @@ shareRoutes.post('/:slug', async (c) => {
   return c.json(body_)
 })
 
+
+sharePageRoutes.get('/blog/:slug', async (c) => {
+  const slug = c.req.param('slug')
+  const url = new URL(c.req.url)
+  if (!isValidSlug(slug)) return renderShareShell(c, url, null)
+  const collection = await c.env.DB.prepare(
+    'SELECT slug, user_id, folder_id, title FROM blog_collections WHERE slug = ?1',
+  ).bind(slug).first<{ slug: string; user_id: string; folder_id: string; title: string }>()
+  if (collection === null) return renderShareShell(c, url, null)
+  const entries = await c.env.DB.prepare(
+    `SELECT s.slug, n.title, n.excerpt, n.updated_at
+       FROM notes n JOIN shares s ON s.note_id = n.id AND s.user_id = n.user_id
+      WHERE n.user_id = ?1 AND n.folder_id = ?2 AND n.deleted_at IS NULL AND n.is_archived = 0
+      ORDER BY n.updated_at DESC`,
+  ).bind(collection.user_id, collection.folder_id).all<{ slug: string; title: string; excerpt: string; updated_at: number }>()
+  const siteName = c.env.APP_NAME || 'Inkstone'
+  const items = (entries.results ?? [])
+    .map((entry) => `    <li><a href="/s/${escapeHtml(entry.slug)}">${escapeHtml(entry.title || 'Untitled note')}</a></li>`)
+    .join('\n')
+  const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>${escapeHtml(collection.title)} · ${escapeHtml(siteName)}</title>
+<style>body{font-family:Georgia,serif;max-width:640px;margin:3rem auto;padding:0 1rem;color:#1a1a1a}h1{font-size:1.6rem}li{margin:.5rem 0}a{color:inherit;text-decoration:underline}small{color:#888}</style>
+</head><body><h1>${escapeHtml(collection.title)}</h1>
+<small>${entries.results?.length ?? 0} notes · ${escapeHtml(siteName)}</small>
+<ul>
+${items}
+</ul></body></html>`
+  return c.html(html, 200, { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' })
+})
 
 sharePageRoutes.get('/:slug', async (c) => {
   const slug = c.req.param('slug')

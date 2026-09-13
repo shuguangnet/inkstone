@@ -189,6 +189,15 @@ export const SCHEMA_STATEMENTS: readonly string[] = [
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_shares_note ON shares(note_id)`,
 
+  `CREATE TABLE IF NOT EXISTS blog_collections (
+    slug TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    folder_id TEXT NOT NULL,
+    title TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
+
   `CREATE TABLE IF NOT EXISTS share_asset_sessions (
     id TEXT PRIMARY KEY,
     slug TEXT NOT NULL,
@@ -591,6 +600,7 @@ const REQUIRED_TABLES = [
   'backup_runs',
   'shares',
   'share_asset_sessions',
+  'blog_collections',
   'changes',
   'sessions',
   'login_attempts',

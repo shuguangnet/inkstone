@@ -526,6 +526,12 @@ export const api = {
     remove: (noteId: string) => request<{ ok: true }>(`/api/share/${noteId}`, { method: 'DELETE' }),
     read: (slug: string, password?: string, signal?: AbortSignal) =>
       request<PublicNote>(`/api/public/${slug}`, { method: 'POST', body: { password }, signal }),
+    createBlog: (folderId: string) =>
+      request<{ slug: string; url: string; title: string; notes: number }>('/api/share/blog', {
+        method: 'POST',
+        body: { folderId },
+      }),
+    removeBlog: (slug: string) => request<{ ok: true }>(`/api/share/blog/${slug}`, { method: 'DELETE' }),
   },
 
   transfer: {
