@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { EditorView } from '@codemirror/view';
-import { ArrowLeft, Columns2, Download, Eye, FileCode, FileDown, FileText, FolderClosed, Hash, History, Link as LinkIcon, ListTree, MoreHorizontal, PanelRightClose, Pencil, Plus, Share2, Star, X, } from 'lucide-react';
+import { ArrowLeft, Columns2, Download, Eye, FileCode, FileDown, FileText, FolderClosed, Hash, History, Link as LinkIcon, ListTree, MoreHorizontal, PanelRightClose, Pencil, Plus, Share2, Sparkles, Star, X, } from 'lucide-react';
 import { cn } from '../../lib/cn';
 import { api } from '../../lib/api';
 import { readingMinutes } from '@shared/markdown-utils';
@@ -22,6 +22,9 @@ import { Outline } from '../preview/Outline';
 import { SplitResizer } from '../shell/Resizer';
 import { EditorToolbar } from './EditorToolbar';
 import { BacklinksPanel } from './BacklinksPanel';
+import { AssistantPanel } from '../ai/AssistantPanel';
+import { SelectionToolbar } from '../ai/SelectionToolbar';
+import { useAi } from '../../store/ai';
 import { SaveIndicator } from '../shell/SaveIndicator';
 import type { Heading } from '../../lib/markdown/renderer';
 import { useUi, type WorkspacePane } from '../../store/ui';
@@ -54,6 +57,8 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
     const openPanel = useUi((s) => s.openPanel);
     const outlineOpen = useUi((s) => s.outlineOpen);
     const backlinksOpen = useUi((s) => s.backlinksOpen);
+    const assistantOpen = useAi((s) => s.panelOpen);
+    const setAssistantOpen = useAi((s) => s.setPanelOpen);
     const toggleOutline = useUi((s) => s.toggleOutline);
     const toggleBacklinks = useUi((s) => s.toggleBacklinks);
     const splitRatio = useUi((s) => s.splitRatio);
@@ -374,6 +379,11 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
               <LinkIcon size={14}/>
             </IconButton>
           </Tooltip>
+          <Tooltip label={t("ai.panel.title")}>
+            <IconButton label={t("ai.panel.title")} size="sm" active={assistantOpen} onClick={() => setAssistantOpen(!assistantOpen)}>
+              <Sparkles size={14}/>
+            </IconButton>
+          </Tooltip>
           {!isMobile && (<Tooltip label={t("common.version_history")}>
               <IconButton label={t("common.version_history")} size="sm" onClick={() => openPanel('versions')}>
                 <History size={14}/>
@@ -408,6 +418,8 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
 
       {settings.editor.showToolbar && showEditor && (<EditorToolbar runCommand={runEditorCommand} mobile={isMobile} onPickImage={() => fileInputRef.current?.click()}/>)}
 
+      <SelectionToolbar view={view}/>
+
       <div ref={containerRef} className="flex min-h-0 flex-1">
         {showEditor && (<div className="min-w-0" style={{ width: layout === 'split' ? editorWidth : '100%' }}>
             <CodeEditor key={note.id} value={content} onChange={onChange} settings={settings.editor} sources={sources} handlers={handlers} onReady={setView}/>
@@ -422,6 +434,8 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
       </div>
 
       {backlinksOpen && paneActive && <BacklinksPanel noteId={note.id}/>}
+
+      {assistantOpen && paneActive && <AssistantPanel onClose={() => setAssistantOpen(false)}/>}
 
       <Menu anchor={moreButtonRef} open={moreMenuOpen} onClose={() => setMoreMenuOpen(false)} items={grouped ? groupedItems : mobileItems} align="end" width={220}/>
       {isMobile && showPreview && (<Drawer open={mobileOutlineOpen} onClose={() => setMobileOutlineOpen(false)} side="right" width={320} title={t("common.outline")}>
