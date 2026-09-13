@@ -48,6 +48,7 @@ import { acquireLease } from '../lib/lease'
 import { broadcastCursor, scheduleFtsDrain } from '../lib/notify'
 import { assertContentSize, FORM_BODY_LIMITS, readFormDataWithinLimit } from '../lib/request'
 import { readZip, type UnzippedEntry } from '@shared/zip'
+import { parseEvernoteEnex } from '../lib/external-import'
 import {
   buildObsidianAssetIndex,
   collectObsidianReferences,
@@ -294,6 +295,18 @@ transferRoutes.post('/import', async (c) => {
           result,
           ftsEnabled,
         })
+      } else if (name.endsWith('.enex')) {
+        const notes = parseEvernoteEnex(await file.text())
+        if (notes.length === 0) {
+          addWarning(result, `${selected.path}: no importable Evernote notes were found`)
+        }
+        for (const note of notes) {
+          const safeTitle = note.title.replace(/[\\/:*?"<>|]/g, '_').slice(0, 120)
+          await importMarkdown(
+            c, userId, `Evernote/${safeTitle}.md`, note.content,
+            { folderCache, result, ftsEnabled },
+          )
+        }
       } else if (/\.(md|markdown|txt)$/i.test(name)) {
         if (file.size > LIMITS.contentMaxBytes) {
           throw new Error(`Note content cannot exceed ${formatBytes(LIMITS.contentMaxBytes)}`)
