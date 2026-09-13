@@ -9,9 +9,9 @@ import type { EditorLayout } from '@shared/types';
 import { fullTime } from '../../lib/time';
 import { useBreakpoint, useRelativeTime } from '../../lib/hooks';
 import { prettyCombo } from '../../lib/hotkeys';
-import { IconButton } from '../../components/primitives';
+import { Button, IconButton } from '../../components/primitives';
 import { Drawer, Menu, Tooltip, type MenuItem } from '../../components/overlay';
-import { Segmented } from '../../components/form';
+import { Input, Segmented } from '../../components/form';
 import { EditorSkeleton, Empty } from '../../components/feedback';
 import { CodeEditor } from '../../editor/CodeEditor';
 import { insertFiles } from '../../editor/paste';
@@ -32,6 +32,7 @@ import { useSession } from '../../store/session';
 import { createContextualNote, useActiveNote, useNotes } from '../../store/notes';
 import { folderPathLabel, openFolderView } from '../../lib/folders';
 import { useSyncScroll } from './sync-scroll';
+import { decryptNoteContent, encryptNoteContent, isEncryptedNote } from '../../lib/note-crypto';
 import { t, useLocale } from "../../lib/i18n";
 import { preferredScrollBehavior } from '../../lib/motion';
 const SPLIT_HANDLE_WIDTH = 1;
@@ -80,6 +81,10 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
     const [moreMenuOpen, setMoreMenuOpen] = useState(false);
     const [exportMenuOpen, setExportMenuOpen] = useState(false);
     const [mobileOutlineOpen, setMobileOutlineOpen] = useState(false);
+    const [cryptoOpen, setCryptoOpen] = useState(false);
+    const [cryptoPassphrase, setCryptoPassphrase] = useState('');
+    const [cryptoMode, setCryptoMode] = useState<'encrypt' | 'decrypt'>('encrypt');
+    const [cryptoError, setCryptoError] = useState<string | null>(null);
     const [containerWidth, setContainerWidth] = useState(0);
     const isMobile = breakpoint === 'mobile';
     const paneActive = !grouped || pane === 'active' || activeWorkspacePane === pane;
@@ -245,6 +250,29 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
         { id: 'html', label: t("workspace.export_html"), icon: <FileCode size={13}/>, onSelect: () => void exportNote('html') },
         { id: 'pdf', label: t("workspace.export_pdf"), icon: <FileDown size={13}/>, onSelect: () => void exportNote('pdf') },
     ];
+    const openCrypto = (mode: 'encrypt' | 'decrypt') => {
+        setCryptoMode(mode);
+        setCryptoPassphrase('');
+        setCryptoError(null);
+        setCryptoOpen(true);
+    };
+    const runCrypto = async () => {
+        if (note === null) return;
+        try {
+            const next = cryptoMode === 'encrypt'
+                ? await encryptNoteContent(content, cryptoPassphrase)
+                : await decryptNoteContent(content, cryptoPassphrase);
+            editContent(note.id, next);
+            setCryptoOpen(false);
+            setCryptoPassphrase('');
+        } catch (error) {
+            const code = error instanceof Error ? error.message : String(error);
+            setCryptoError(code === 'wrong_passphrase'
+                ? t("workspace.crypto_wrong_passphrase")
+                : t("workspace.crypto_failed"));
+        }
+    };
+
     const mobileItems: MenuItem[] = [
         {
             id: 'versions',
@@ -257,6 +285,12 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
             label: t("workspace.share"),
             icon: <Share2 size={13}/>,
             onSelect: () => openPanel('share'),
+        },
+        {
+            id: 'crypto',
+            label: isEncryptedNote(content) ? t("workspace.decrypt_note") : t("workspace.encrypt_note"),
+            icon: <FileCode size={13}/>,
+            onSelect: () => openCrypto(isEncryptedNote(content) ? 'decrypt' : 'encrypt'),
         },
         {
             id: 'export-md',
@@ -294,6 +328,12 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
             icon: <LinkIcon size={13}/>,
             checked: backlinksOpen && paneActive,
             onSelect: toggleBacklinks,
+        },
+        {
+            id: 'crypto',
+            label: isEncryptedNote(content) ? t("workspace.decrypt_note") : t("workspace.encrypt_note"),
+            icon: <FileCode size={13}/>,
+            onSelect: () => openCrypto(isEncryptedNote(content) ? 'decrypt' : 'encrypt'),
         },
         ...(showPreview ? [{
             id: 'outline',
@@ -438,6 +478,27 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
       {assistantOpen && paneActive && <AssistantPanel onClose={() => setAssistantOpen(false)}/>}
 
       <Menu anchor={moreButtonRef} open={moreMenuOpen} onClose={() => setMoreMenuOpen(false)} items={grouped ? groupedItems : mobileItems} align="end" width={220}/>
+      <Drawer open={cryptoOpen} onClose={() => setCryptoOpen(false)} title={cryptoMode === 'encrypt' ? t("workspace.encrypt_note") : t("workspace.decrypt_note")} width={340}>
+        <div className="space-y-3 p-4">
+          <p className="text-xs text-[var(--text-tertiary)]">
+            {cryptoMode === 'encrypt' ? t("workspace.crypto_encrypt_hint") : t("workspace.crypto_decrypt_hint")}
+          </p>
+          <Input
+            type="password"
+            autoFocus
+            value={cryptoPassphrase}
+            placeholder={t("workspace.crypto_passphrase")}
+            onChange={(event) => setCryptoPassphrase(event.target.value)}
+          />
+          {cryptoError !== null && <p className="text-xs text-[var(--danger)]">{cryptoError}</p>}
+          <Button size="sm" variant="primary" className="w-full"
+            disabled={cryptoPassphrase === ''}
+            onClick={() => void runCrypto()}
+          >
+            {cryptoMode === 'encrypt' ? t("workspace.encrypt_note") : t("workspace.decrypt_note")}
+          </Button>
+        </div>
+      </Drawer>
       {isMobile && showPreview && (<Drawer open={mobileOutlineOpen} onClose={() => setMobileOutlineOpen(false)} side="right" width={320} title={t("common.outline")}>
           <Outline headings={headings} scrollerRef={previewScrollerRef} className="max-h-none w-full self-stretch py-3" onSelect={(heading) => {
                 jumpToHeading(heading);

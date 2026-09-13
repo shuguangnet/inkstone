@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, ArrowDown, ArrowUp, ChevronRight, Clock, CornerUpLeft, FilePlus2, FileText, FolderClosed, FolderInput, FolderOpen, FolderPlus, Hash, Inbox, LogOut, Moon, MoreHorizontal, Palette, PanelLeft, PanelLeftClose, Pencil, Plus, Settings, Star, Sun, Trash2, Waypoints, } from 'lucide-react';
+import { Archive, ArrowDown, ArrowUp, CalendarDays, CheckSquare, ChevronRight, Clock, CornerUpLeft, FilePlus2, FileText, FolderClosed, FolderInput, FolderOpen, FolderPlus, Globe, Hash, Inbox, LogOut, Moon, MoreHorizontal, Palette, PanelLeft, PanelLeftClose, Pencil, Plus, Settings, Star, Sun, Trash2, Waypoints, } from 'lucide-react';
 import { LIMITS } from '@shared/constants';
+import { TemplateMenu } from '../templates/TemplateMenu';
+import { api } from '../../lib/api';
 import type { Tag, ViewKind } from '@shared/types';
 import { compareTagNames } from '@shared/markdown-utils';
 import { cn } from '../../lib/cn';
@@ -39,13 +41,18 @@ export function Sidebar({ collapsed = false, onCollapse, }: {
           </Tooltip>)}
       </header>
 
-      <div className="shrink-0 px-2 pt-2"><SearchButton /></div>
+      <div className="flex shrink-0 items-center gap-1.5 px-2 pt-2">
+        <div className="min-w-0 flex-1"><SearchButton /></div>
+        <TemplateMenu />
+      </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-2 pb-4">
         <div className="space-y-px">
           <ViewItem icon={<FileText size={14}/>} label={t("navigation.all_notes")} view="all" count={counts.all} active={view === 'all'} onSelect={openView}/>
           <ViewItem icon={<Clock size={14}/>} label={t("navigation.recently_edited")} view="recent" active={view === 'recent'} onSelect={openView}/>
           <ViewItem icon={<Star size={14}/>} label={t("navigation.favorites")} view="starred" count={counts.starred} active={view === 'starred'} onSelect={openView}/>
+          <ViewItem icon={<CheckSquare size={14}/>} label={t("navigation.tasks")} view="tasks" active={view === 'tasks'} onSelect={openView}/>
+          <ViewItem icon={<CalendarDays size={14}/>} label={t("navigation.calendar")} view="calendar" active={view === 'calendar'} onSelect={openView}/>
           <ViewItem icon={<Inbox size={14}/>} label={t("navigation.unfiled")} view="unfiled" count={counts.unfiled} active={view === 'unfiled'} onSelect={openView}/>
         </div>
 
@@ -82,9 +89,11 @@ function SidebarRail({ onExpand }: {
         <SearchButton variant="icon" />
         <RailButton label={t("navigation.all_notes")} active={view === 'all'} icon={<FileText size={16}/>} onClick={() => openView('all')}/>
         <RailButton label={t("navigation.favorites")} active={view === 'starred'} icon={<Star size={16}/>} onClick={() => openView('starred')}/>
+        <RailButton label={t("navigation.tasks")} active={view === 'tasks'} icon={<CheckSquare size={16}/>} onClick={() => openView('tasks')}/>
         <RailButton label={t("navigation.trash")} active={view === 'trash'} icon={<Trash2 size={16}/>} onClick={() => openView('trash')}/>
         <div className="my-1 h-px w-6 bg-[var(--border-subtle)]"/>
         <RailButton label={t("common.new_note")} combo="mod+n" accent icon={<FilePlus2 size={16}/>} onClick={() => void createContextualNote()}/>
+        <TemplateMenu rail/>
       </div>
 
       <span className="flex-1"/>
@@ -473,11 +482,21 @@ function FolderRow({ node, siblings, index, parentNode, parentSiblings, onCreate
             return;
         void onMove(node.id, parentNode.parentId, parentSiblings[parentIndex + 1]?.id ?? null);
     };
+    const publishBlog = async (folderId: string) => {
+        try {
+            const result = await api.share.createBlog(folderId);
+            useUi.getState().toast({ title: t("folders.blog_published_toast"), description: result.url, tone: 'success' });
+            void navigator.clipboard?.writeText(result.url).catch(() => undefined);
+        } catch (error) {
+            useUi.getState().toast({ title: t("folders.blog_publish_failed"), description: error instanceof Error ? error.message : String(error), tone: 'danger' });
+        }
+    };
     const menuItems: MenuItem[] = [
         { id: 'rename', label: t("sidebar.rename"), onSelect: () => onStartRename(node.id) },
         { id: 'new-note', label: t("sidebar.create_new_note_here"), icon: <FilePlus2 size={13}/>, onSelect: () => void useNotes.getState().createNote({ folderId: node.id }) },
         { id: 'new-child', label: t("sidebar.new_subfolder"), icon: <FolderPlus size={13}/>, disabled: !canCreateChild, onSelect: () => onCreateChild(node.id) },
         { id: 'appearance', label: t("folders.appearance"), icon: <Palette size={13}/>, onSelect: () => onEditAppearance(node.id) },
+        { id: 'publish-blog', label: t("folders.publish_as_blog"), icon: <Globe size={13}/>, onSelect: () => void publishBlog(node.id) },
         { id: 'move-to', label: t("folders.move_to"), icon: <FolderInput size={13}/>, separatorBefore: true, onSelect: () => onChooseParent(node.id) },
         { id: 'move-earlier', label: t("sidebar.move_earlier"), icon: <ArrowUp size={13}/>, disabled: index === 0, onSelect: moveEarlier },
         { id: 'move-later', label: t("sidebar.move_later"), icon: <ArrowDown size={13}/>, disabled: index === siblings.length - 1, onSelect: moveLater },

@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import type { AppBindings } from '../env'
 import { ApiError } from '../lib/errors'
+import { searchMcpNotes } from '../mcp/retrieval'
 import { requireAuth } from '../middleware/auth'
 import { buildChatMessages, type AiAction } from './prompts'
 import { AiGuard, loadQuota, recordUsage } from './quota'
@@ -129,8 +130,22 @@ aiRoutes.post('/chat', async (c) => {
     throw new ApiError(429, 'ai_busy', 'Another AI request is already running')
   }
 
+  let context: { title: string; snippet: string }[] | undefined
+  if (body.action === 'ask' && (body.message ?? '') !== '') {
+    try {
+      const retrieval = await searchMcpNotes(
+        c.env, userId, new URL(c.req.url).origin, c.get('database').ftsEnabled,
+        { query: body.message!, limit: 6, mode: 'auto' },
+      )
+      context = retrieval.results.map((hit) => ({ title: hit.title, snippet: hit.snippet }))
+    } catch {
+      context = undefined
+    }
+  }
+
   const messages = buildChatMessages({
     action: body.action,
+    context,
     noteTitle: body.noteTitle,
     noteContent: body.noteContent,
     selection: body.selection,
@@ -192,7 +207,7 @@ function aiAvailable(env: AppBindings['Bindings'], settings: {
   return settings.hasKey && settings.baseUrl !== '' && settings.model !== ''
 }
 
-async function resolveProvider(
+export async function resolveProvider(
   env: AppBindings['Bindings'],
   userId: string,
   settings: Awaited<ReturnType<typeof loadAiSettings>>,

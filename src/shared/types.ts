@@ -205,6 +205,7 @@ export interface Backlink {
 }
 
 export interface Attachment {
+  aiDescription?: string
   id: string
   noteId: string | null
   filename: string
@@ -224,6 +225,8 @@ export interface AttachmentWithUsage extends Attachment {
 export type ViewKind =
   | 'all'
   | 'recent'
+  | 'tasks'
+  | 'calendar'
   | 'starred'
   | 'unfiled'
   | 'archived'

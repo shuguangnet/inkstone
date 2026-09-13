@@ -8,6 +8,7 @@
  * feature degrades to plain lexical search instead of failing (the old
  * behavior that surfaced as HTTP 503s).
  */
+import { ENCRYPTED_NOTE_PREFIX } from '@shared/constants'
 import { toPlainText } from '@shared/markdown-utils'
 import { truncateText } from '@shared/text-utils'
 import { getMeta, selectQueueUsersRoundRobin, setMeta } from '../db/metadata'
@@ -117,6 +118,26 @@ function aiSearchPrefKey(userId: string): string {
  * vice versa. Queuing is skipped entirely while the account has AI search
  * disabled, except deletions which always clean up stale vectors.
  */
+/** Encrypted note bodies are opaque ciphertext; skip semantic indexing. */
+export async function enqueueNoteIndexUnlessEncrypted(
+  db: D1Database,
+  userId: string,
+  noteId: string,
+  kind: AiIndexKind,
+  now = Date.now(),
+): Promise<void> {
+  if (kind === 'embed') {
+    const row = await db.prepare('SELECT content FROM notes WHERE id = ?1 AND user_id = ?2')
+      .bind(noteId, userId)
+      .first<{ content: string }>()
+    if (row?.content.startsWith(ENCRYPTED_NOTE_PREFIX)) {
+      await noteIndexQueueStatement(db, userId, noteId, 'delete', now).run()
+      return
+    }
+  }
+  await noteIndexQueueStatement(db, userId, noteId, kind, now).run()
+}
+
 export async function enqueueNoteIndex(
   db: D1Database,
   userId: string,

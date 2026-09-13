@@ -18,6 +18,7 @@ const AI_ERRORS = {
 } as const;
 
 const QUICK_ACTIONS: readonly { action: AiAction; labelKey: MessageKey }[] = [
+  { action: 'ask', labelKey: 'ai.action.ask' },
   { action: 'polish', labelKey: 'ai.action.polish' },
   { action: 'summarize', labelKey: 'ai.action.summarize' },
   { action: 'title', labelKey: 'ai.action.title' },
