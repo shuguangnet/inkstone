@@ -169,3 +169,53 @@ export function parseEvernoteEnex(xml: string): ExternalNote[] {
     }
     return notes
 }
+
+const NOTION_IDENTIFIER = / ([0-9a-f]{32})(\.[^.]+)?$/
+const NOTION_SEGMENT_WITH_EXT = /^(.*) ([0-9a-f]{32})(\.[^.]+)?$/i
+
+/** True when ANY path segment carries Notion's `Name <32-hex>` identifier. */
+export function isNotionExportEntry(path: string): boolean {
+  return path.split('/').some((segment) => NOTION_IDENTIFIER.test(segment))
+}
+
+/** Strips Notion's 32-hex identifier suffix from every path segment so
+ * imported titles and folders read naturally: `Meeting ab12…cd.md` becomes
+ * `Meeting.md`. Returns the cleaned path plus the old→new rename pair for
+ * each segment that changed, used to rewrite links inside note bodies. */
+export function stripNotionIdentifiers(path: string): {
+  readonly path: string
+  readonly renames: readonly { readonly from: string; readonly to: string }[]
+} {
+  const segments = path.split('/')
+  const renames: { from: string; to: string }[] = []
+  const cleaned: string[] = []
+  for (const [index, segment] of segments.entries()) {
+    const match = NOTION_SEGMENT_WITH_EXT.exec(segment)
+    if (match === null || match[1] === '') {
+      cleaned.push(segment)
+      continue
+    }
+    const cleanedSegment = `${match[1]!}${match[3] ?? ''}`
+    const from = segments.slice(0, index + 1).join('/')
+    const to = [...cleaned, cleanedSegment].join('/')
+    cleaned.push(cleanedSegment)
+    renames.push({ from, to })
+  }
+  return { path: cleaned.join('/'), renames }
+}
+
+/** Rewrites Notion's percent-encoded, identifier-bearing links inside a note
+ * body so they match the cleaned paths. */
+export function rewriteNotionLinks(content: string, renames: readonly {
+  readonly from: string
+  readonly to: string
+}[]): string {
+  let result = content
+  for (const rename of renames) {
+    result = result
+      .replaceAll(encodeURI(rename.from), rename.to)
+      .replaceAll(rename.from.replaceAll(' ', '%20'), rename.to)
+      .replaceAll(rename.from, rename.to)
+  }
+  return result
+}

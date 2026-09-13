@@ -35,6 +35,29 @@ export function createBackupArchive(snapshot: Snapshot): BackupArchive {
   }
 }
 
+/** Builds a ZIP from an arbitrary file list — used by the Obsidian/Notion
+ * portable vault exports, which intentionally omit Inkstone control files. */
+export function createPortableArchive(
+  files: readonly BackupFile[],
+  filename: string,
+  lastModified: Date,
+): BackupArchive {
+  const byteLength = predictLength(metadataFromFiles(files, lastModified))
+  const byteLengthNumber = Number(byteLength)
+  if (!Number.isSafeInteger(byteLengthNumber) || byteLengthNumber < 0) {
+    throw new Error('The export ZIP is too large to transfer safely')
+  }
+  return {
+    filename,
+    byteLength,
+    byteLengthNumber,
+    stream: cancellationSafeStream(makeZip(openFiles(files, lastModified), {
+      length: byteLength,
+      buffersAreUTF8: true,
+    })),
+  }
+}
+
 function snapshotFiles(snapshot: Snapshot): BackupFile[] {
   return [...snapshot.payloadFiles, snapshot.manifestFile, snapshot.completeFile]
 }

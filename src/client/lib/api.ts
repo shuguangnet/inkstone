@@ -544,6 +544,17 @@ export const api = {
 
   transfer: {
     save: saveDownload,
+    saveVault: (flavor: 'obsidian' | 'notion') => {
+      const fallback = flavor === 'obsidian' ? 'inkstone-obsidian.zip' : 'inkstone-notion.zip'
+      const run = async () => {
+        const { response, filename } = await fetchDownload(
+          `/api/export?format=zip&flavor=${flavor}`,
+          fallback,
+        )
+        await saveResponseDownload(response, filename)
+      }
+      return run()
+    },
     import: (
       files: File[],
       conflict: 'skip' | 'newer' | 'duplicate' = 'newer',

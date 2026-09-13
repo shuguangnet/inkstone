@@ -58,6 +58,20 @@ export function DataSettings() {
             }
         }
     };
+    const exportVault = async (flavor: 'obsidian' | 'notion') => {
+        await run(`export-${flavor}`, async () => {
+            try {
+                await api.transfer.saveVault(flavor);
+            }
+            catch (error) {
+                toast({
+                    title: t("common.export_failed"),
+                    description: error instanceof Error ? error.message : String(error),
+                    tone: 'danger',
+                });
+            }
+        });
+    };
     const exportData = async (format: 'zip' | 'json') => {
         await run(`export-${format}`, async () => {
             try {
@@ -150,6 +164,8 @@ export function DataSettings() {
 
         <SettingRow title={t("settings.export_to_zip")} description={t("settings.includes_every_note_folder_tag_and_attachment_for_a_complete_restore_plu")}>
           <Button size="sm" icon={<Download size={13}/>} loading={busy === 'export-zip'} disabled={busy !== null} onClick={() => void exportData('zip')}>{t("settings.download_zip")}</Button>
+          <Button size="sm" icon={<Download size={13}/>} loading={busy === 'export-obsidian'} disabled={busy !== null} onClick={() => void exportVault('obsidian')}>{t("settings.download_obsidian")}</Button>
+          <Button size="sm" icon={<Download size={13}/>} loading={busy === 'export-notion'} disabled={busy !== null} onClick={() => void exportVault('notion')}>{t("settings.download_notion")}</Button>
         </SettingRow>
 
         <SettingRow title={t("settings.export_to_json")} description={t("settings.structured_note_data_without_attachment_binaries_download_zip_for_a_comp")}>

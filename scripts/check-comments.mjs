@@ -122,6 +122,9 @@ const allowed = new Map([
     "/** Passphrase encryption for backup archives stored on third-party targets.\n * Format: MAGIC + base64(salt).base64(iv).base64(ciphertext) — a UTF-8 text\n * payload so targets and restore flows can detect it by prefix. Encryption\n * happens server-side with the passphrase held in the credential vault; the\n * vault never exposes it to the browser. */",
     "/** Buffers a generated archive stream, encrypts it, and re-wraps it as a\n * backup archive with the same filename. Memory peaks at the archive size. */",
   ]],
+  ["src/worker/backup/archive.ts", [
+    "/** Builds a ZIP from an arbitrary file list — used by the Obsidian/Notion\n * portable vault exports, which intentionally omit Inkstone control files. */",
+  ]],
   ["src/worker/backup/restore.ts", [
     "/** Pulls a backup archive back from a WebDAV or S3 target — the read half\n * of bidirectional sync. Restores then flow through the standard import\n * path, so conflict rules and version-safe writes are unchanged. */",
   ]],
@@ -160,6 +163,9 @@ const allowed = new Map([
     "/** Converts an ENML fragment into Markdown lines. Lists (including the\n * Evernote-specific `<en-todo/>` checkboxes) nest one level per `<ul>`/`<ol>`. */",
     "// Recurse on the list body up to its matching close tag.",
     "/** Extracts every `<note>` from an Evernote export. */",
+    "/** True when ANY path segment carries Notion's `Name <32-hex>` identifier. */",
+    "/** Strips Notion's 32-hex identifier suffix from every path segment so\n * imported titles and folders read naturally: `Meeting ab12…cd.md` becomes\n * `Meeting.md`. Returns the cleaned path plus the old→new rename pair for\n * each segment that changed, used to rewrite links inside note bodies. */",
+    "/** Rewrites Notion's percent-encoded, identifier-bearing links inside a note\n * body so they match the cleaned paths. */",
   ]],
   ["src/worker/lib/request.ts", [
     "// CF-Connecting-IP is injected by the Cloudflare edge and cannot be",
@@ -237,6 +243,8 @@ const allowed = new Map([
     "/** Extracts open `- [ ]` task lines across a user's active notes. */",
   ]],
   ["src/worker/routes/transfer.ts", [
+    "// Portable vault: readable Markdown plus attachments, no Inkstone",
+    "// control files (README/manifest/COMPLETE).",
     "/** Restores a complete Inkstone Markdown backup ZIP (bytes) using the\n * standard import path. Used by the backup-pull restore route. */",
     "// A merge always writes: force the imported timestamp past the local one.",
     "// No base version to merge against: fall through to newer semantics.",

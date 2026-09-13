@@ -40,7 +40,7 @@ import {
   buildSnapshot,
   formatStamp,
 } from '../backup/snapshot'
-import { createBackupArchive } from '../backup/archive'
+import { createBackupArchive, createPortableArchive } from '../backup/archive'
 import { sha256Hex } from '../lib/encoding'
 import { ApiError } from '../lib/errors'
 import { isValidId, newId } from '../lib/id'
@@ -48,7 +48,7 @@ import { acquireLease } from '../lib/lease'
 import { broadcastCursor, scheduleFtsDrain } from '../lib/notify'
 import { assertContentSize, FORM_BODY_LIMITS, readFormDataWithinLimit } from '../lib/request'
 import { readZip, type UnzippedEntry } from '@shared/zip'
-import { parseEvernoteEnex } from '../lib/external-import'
+import { isNotionExportEntry, parseEvernoteEnex, rewriteNotionLinks, stripNotionIdentifiers } from '../lib/external-import'
 import { threeWayMerge } from '../lib/three-way-merge'
 import {
   buildObsidianAssetIndex,
@@ -110,7 +110,22 @@ transferRoutes.get('/export', async (c) => {
     }
 
     const snapshot = await buildSnapshot(c.env, userId)
-    const archive = createBackupArchive(snapshot)
+    const flavor = c.req.query('flavor')
+    let archive = createBackupArchive(snapshot)
+    let filename = archive.filename
+    if (flavor === 'obsidian' || flavor === 'notion') {
+      // Portable vault: readable Markdown plus attachments, no Inkstone
+      // control files (README/manifest/COMPLETE).
+      const portable = snapshot.payloadFiles.filter((file) => file.kind !== 'readme')
+      archive = createPortableArchive(
+        portable,
+        flavor === 'obsidian'
+          ? `inkstone-obsidian-${snapshot.stamp}.zip`
+          : `inkstone-notion-${snapshot.stamp}.zip`,
+        snapshot.createdAt,
+      )
+      filename = archive.filename
+    }
     const fixed = new FixedLengthStream(archive.byteLength)
     void archive.stream.pipeTo(fixed.writable).catch((error) => {
       console.error('[inkstone] Streaming ZIP export failed:', error)
@@ -118,7 +133,7 @@ transferRoutes.get('/export', async (c) => {
     return new Response(fixed.readable as BodyInit, {
       headers: {
         'Content-Type': 'application/zip',
-        'Content-Disposition': `attachment; filename="${archive.filename}"`,
+        'Content-Disposition': `attachment; filename="${filename}"`,
         'Cache-Control': 'private, no-store',
       },
     })
@@ -274,10 +289,30 @@ transferRoutes.post('/import', async (c) => {
             maxEntryBytes: LIMITS.attachmentMaxBytes,
             include: isImportableEntryPath,
           })
-          const assets = buildObsidianAssetIndex(entries.filter((entry) => !isMarkdownPath(entry.path)))
-          for (const entry of entries) {
+          const notionEntries = entries.filter((entry) => isNotionExportEntry(entry.path))
+          const csvEntries = notionEntries.length > 0
+            ? entries.filter((entry) => /\.csv$/i.test(entry.path))
+            : []
+          if (notionEntries.length > 0 && csvEntries.length > 0) {
+            addWarning(result, `Skipped ${csvEntries.length} Notion database CSV file(s); tables are not part of this import`)
+          }
+          type ImportableZipEntry = UnzippedEntry & { renames?: { from: string; to: string }[] }
+          const importable: ImportableZipEntry[] = notionEntries.length > 0
+            ? entries
+                .filter((entry) => isImportableEntryPath(entry.path) && !/\.csv$/i.test(entry.path))
+                .map((entry) => {
+                  const cleaned = stripNotionIdentifiers(entry.path)
+                  return { ...entry, path: cleaned.path, renames: [...cleaned.renames] }
+                })
+            : entries
+          const assets = buildObsidianAssetIndex(importable.filter((entry) => !isMarkdownPath(entry.path)))
+          for (const entry of importable) {
             if (!isMarkdownPath(entry.path)) continue
-            await importMarkdown(c, userId, entry.path, new TextDecoder().decode(entry.data), {
+            let text = new TextDecoder().decode(entry.data)
+            if (entry.renames !== undefined && entry.renames.length > 0) {
+              text = rewriteNotionLinks(text, entry.renames)
+            }
+            await importMarkdown(c, userId, entry.path, text, {
               folderCache,
               result,
               ftsEnabled,

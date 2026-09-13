@@ -683,6 +683,8 @@ export const ZH_CN_MESSAGES = {
     "settings.ai_api_key_optional": "Ollama 等本地运行时可不填；云端服务将加密保存",
     "settings.backup_passphrase": "备份加密口令",
     "settings.backup_passphrase_hint": "可选：归档上传前 AES-GCM 加密，恢复时必需。口令无法找回",
+    "settings.download_obsidian": "Obsidian 库（ZIP）",
+    "settings.download_notion": "Notion Markdown（ZIP）",
     "ai.panel.title": "AI 助手",
     "ai.panel.stop": "停止生成",
     "ai.panel.not_configured": "AI 助手尚未配置。请在 设置 → AI 中开启。",

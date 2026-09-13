@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { parseEvernoteEnex, decodeXmlEntities } from './external-import';
+import {
+    decodeXmlEntities,
+    isNotionExportEntry,
+    parseEvernoteEnex,
+    rewriteNotionLinks,
+    stripNotionIdentifiers,
+} from './external-import';
 
 describe('decodeXmlEntities', () => {
     it('decodes the guaranteed entities and numeric refs', () => {
@@ -47,5 +53,42 @@ describe('parseEvernoteEnex', () => {
 
     it('returns no notes when nothing has content', () => {
         expect(parseEvernoteEnex('<en-export></en-export>')).toEqual([]);
+    });
+});
+
+describe('Notion export helpers', () => {
+    it('detects Notion identifier suffixes', () => {
+        expect(isNotionExportEntry('Meeting notes ab12cd34ab12cd34ab12cd34ab12cd34.md')).toBe(true);
+        expect(isNotionExportEntry('notes/My page 0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d/image.png')).toBe(true);
+        expect(isNotionExportEntry('notes/plain.md')).toBe(false);
+        expect(isNotionExportEntry('notes/data.csv')).toBe(false);
+    });
+
+    it('strips identifiers from all segments and records renames', () => {
+        const cleaned = stripNotionIdentifiers(
+            'Projects/Team meeting 0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d/Team meeting 0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d.md',
+        );
+        expect(cleaned.path).toBe('Projects/Team meeting/Team meeting.md');
+        expect(cleaned.renames.length).toBe(2);
+    });
+
+    it('leaves non-Notion paths untouched', () => {
+        const cleaned = stripNotionIdentifiers('notes/plain.md');
+        expect(cleaned.path).toBe('notes/plain.md');
+        expect(cleaned.renames).toEqual([]);
+    });
+
+    it('rewrites links in note bodies to the cleaned paths', () => {
+        const rewritten = rewriteNotionLinks(
+            '[link](Team%20meeting%200a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d/Team%20meeting%200a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d.md) and ![img](Team%20meeting%200a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d/img.png)',
+            [
+                {
+                    from: 'Team meeting 0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d',
+                    to: 'Team meeting',
+                },
+            ],
+        );
+        expect(rewritten).toContain('(Team meeting/Team meeting.md)');
+        expect(rewritten).toContain('(Team meeting/img.png)');
     });
 });

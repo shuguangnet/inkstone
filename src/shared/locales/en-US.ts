@@ -682,6 +682,8 @@ export const EN_US_MESSAGES = {
     "settings.ai_api_key_optional": "Optional for local runtimes like Ollama; stored encrypted otherwise",
     "settings.backup_passphrase": "Backup encryption passphrase",
     "settings.backup_passphrase_hint": "Optional: archives are AES-GCM encrypted on upload; required to restore. Cannot be recovered",
+    "settings.download_obsidian": "Obsidian vault (ZIP)",
+    "settings.download_notion": "Notion Markdown (ZIP)",
     "ai.panel.title": "AI Assistant",
     "ai.panel.stop": "Stop generating",
     "ai.panel.not_configured": "AI assistant is not configured yet. Enable it in Settings → AI.",
