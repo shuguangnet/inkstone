@@ -55,6 +55,8 @@ const allowed = new Map([
   ["src/client/lib/i18n.ts", [
     "/** Provides typed runtime localization with on-demand locale loading. */",
     "// Preload the other locale in background for instant switching, but don't block init",
+    "// Only route genuine storage errors to the backup message; unknown",
+    "// messages are shown verbatim instead of a misleading fallback.",
   ]],
   ["src/client/lib/markdown/renderer.ts", [
     "/** Builds the sanitized Markdown rendering pipeline and its Inkstone-specific syntax extensions. */",
@@ -120,8 +122,9 @@ const allowed = new Map([
   ]],
   ["src/worker/ai/settings.ts", [
     "/** Plaintext API key; omitted keeps the stored one, empty string removes it. */",
-    "// Local runtimes (e.g. Ollama) expose OpenAI-compatible endpoints without",
-    "// any key; only the endpoint and model are mandatory.",
+    "// Completeness (endpoint/model present) is enforced at chat time via the",
+    "// availability check, so users can save a draft configuration without the",
+    "// UI rejecting intermediate states (e.g. right after switching provider).",
   ]],
   ["src/worker/backup/archive-crypto.ts", [
     "/** Passphrase encryption for backup archives stored on third-party targets.\n * Format: MAGIC + base64(salt).base64(iv).base64(ciphertext) — a UTF-8 text\n * payload so targets and restore flows can detect it by prefix. Encryption\n * happens server-side with the passphrase held in the credential vault; the\n * vault never exposes it to the browser. */",
