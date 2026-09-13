@@ -205,6 +205,7 @@ export interface Backlink {
 }
 
 export interface Attachment {
+  aiDescription?: string
   id: string
   noteId: string | null
   filename: string

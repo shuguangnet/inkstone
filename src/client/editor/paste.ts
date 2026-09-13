@@ -133,10 +133,12 @@ export async function insertFiles(view: EditorView, files: File[], handlers: Pas
 }
 export function uploadedFileMarkdown(result: {
     url: string;
+    aiDescription?: string;
     filename: string;
     isImage: boolean;
 }): string {
-    const label = escapeMarkdownLabel(result.isImage ? stripExt(result.filename) : result.filename);
+    const label = escapeMarkdownLabel(
+        result.isImage && result.aiDescription ? result.aiDescription : stripExt(result.filename));
     return markdownLink(label, result.url, result.isImage, true);
 }
 function stripExt(name: string): string {
