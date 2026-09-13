@@ -558,3 +558,5 @@
     background: transparent;
   }
 }
+
+.note-list-rows { contain: layout style; }

@@ -85,6 +85,9 @@ const allowed = new Map([
   ["src/shared/constants.ts", [
     "/** Content prefix marking a client-side encrypted note body. */",
   ]],
+  ["src/shared/markdown-utils.perf.test.ts", [
+    "// 50 large notes: generous CI-stable ceiling for a real regression signal.",
+  ]],
   ["src/shared/markdown-utils.ts", [
     "/** Provides pure Markdown analysis shared by the browser and Worker runtimes. */",
   ]],
@@ -93,6 +96,9 @@ const allowed = new Map([
     "/* storage unavailable; templates stay in memory for this session */",
     "/* ignore */",
     "/** Expands a relative date placeholder like {{date}} / {{time}} at insert time. */",
+  ]],
+  ["src/shared/types.ts", [
+    "/** Free-form instructions appended to every AI assistant system prompt. */",
   ]],
   ["src/worker/ai/prompts.ts", [
     "/** System rules every assistant call receives. User note text is always\n * wrapped in explicit delimiters so instructions inside notes are data. */",
@@ -109,6 +115,12 @@ const allowed = new Map([
   ]],
   ["src/worker/ai/settings.ts", [
     "/** Plaintext API key; omitted keeps the stored one, empty string removes it. */",
+    "// Local runtimes (e.g. Ollama) expose OpenAI-compatible endpoints without",
+    "// any key; only the endpoint and model are mandatory.",
+  ]],
+  ["src/worker/backup/archive-crypto.ts", [
+    "/** Passphrase encryption for backup archives stored on third-party targets.\n * Format: MAGIC + base64(salt).base64(iv).base64(ciphertext) — a UTF-8 text\n * payload so targets and restore flows can detect it by prefix. Encryption\n * happens server-side with the passphrase held in the credential vault; the\n * vault never exposes it to the browser. */",
+    "/** Buffers a generated archive stream, encrypts it, and re-wraps it as a\n * backup archive with the same filename. Memory peaks at the archive size. */",
   ]],
   ["src/worker/backup/restore.ts", [
     "/** Pulls a backup archive back from a WebDAV or S3 target — the read half\n * of bidirectional sync. Restores then flow through the standard import\n * path, so conflict rules and version-safe writes are unchanged. */",
@@ -153,6 +165,12 @@ const allowed = new Map([
     "// CF-Connecting-IP is injected by the Cloudflare edge and cannot be",
     "// spoofed there. On any other runtime the header is client-controlled,",
     "// so ignore it rather than trusting it for throttling.",
+  ]],
+  ["src/worker/lib/three-way-merge.ts", [
+    "/** Line-level three-way merge for note restore. Each side is diffed against\n * the common base with LCS; per-base-line edits (replacement, deletion, or\n * insertion) from only one side win, identical edits merge cleanly, and\n * conflicting runs keep both versions with markers. */",
+    "/** Per base line: null = unchanged; otherwise the replacement lines\n * (deletion = empty array). Insertions attach before the next base line. */",
+    "// base line deleted (or replaced by lines already in pending)",
+    "// Coalesce consecutive conflicting indices into one block.",
   ]],
   ["src/worker/mcp/ai-search.ts", [
     "/**\n * Private AI semantic search for the MCP module.\n *\n * Notes are embedded with Workers AI (`@cf/baai/bge-m3`, 1024 dims,\n * multilingual) and the vectors live in D1 — no public query endpoint, one\n * index per account. Content changes are queued and drained in the\n * background; when the AI binding is missing or the model call fails the\n * feature degrades to plain lexical search instead of failing (the old\n * behavior that surfaced as HTTP 503s).\n */",
@@ -220,6 +238,8 @@ const allowed = new Map([
   ]],
   ["src/worker/routes/transfer.ts", [
     "/** Restores a complete Inkstone Markdown backup ZIP (bytes) using the\n * standard import path. Used by the backup-pull restore route. */",
+    "// A merge always writes: force the imported timestamp past the local one.",
+    "// No base version to merge against: fall through to newer semantics.",
   ]],
   ["vite.config.ts", [
     "// Keep optional preview renderers and their language modules behind dynamic-import boundaries.",
