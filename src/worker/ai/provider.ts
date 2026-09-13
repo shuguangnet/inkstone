@@ -133,6 +133,31 @@ function parseLine(line: string, extract: (payload: unknown) => string): string 
   }
 }
 
+/** Chat models usable through the Workers AI binding (curated; the platform
+ * has no list endpoint available from inside a Worker). */
+export const WORKERS_AI_CHAT_MODELS: readonly string[] = [
+  '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+  '@cf/meta/llama-3.1-8b-instruct-fast',
+  '@cf/meta/llama-2-7b-chat-int8',
+  '@cf/qwen/qwen1.5-14b-chat-awq',
+  '@cf/mistral/mistral-7b-instruct-v0.1',
+]
+
+/** Extracts model ids from an OpenAI-compatible `/models` response. */
+export function parseModelsResponse(payload: unknown): string[] {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return []
+  const data = (payload as Record<string, unknown>).data
+  if (!Array.isArray(data)) return []
+  const ids: string[] = []
+  for (const item of data) {
+    if (item && typeof item === 'object' && !Array.isArray(item)) {
+      const id = (item as Record<string, unknown>).id
+      if (typeof id === 'string' && id !== '' && !ids.includes(id)) ids.push(id)
+    }
+  }
+  return ids
+}
+
 export function resolveAiModel(settings: { provider: string; model: string }): string {
   if (settings.provider === 'openai_compat') {
     if (!settings.model) throw new Error('ai_model_not_configured')

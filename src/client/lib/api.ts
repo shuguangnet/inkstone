@@ -290,6 +290,8 @@ export interface AiSettingsUpdate {
 export const api = {
   ai: {
     status: (signal?: AbortSignal) => request<AiStatusResponse>('/api/ai/status', { signal }),
+    models: (signal?: AbortSignal) =>
+      request<{ models: string[]; source: 'curated' | 'endpoint' }>('/api/ai/models', { signal }),
     saveSettings: (input: AiSettingsUpdate) =>
       request<{ ok: true; settings: AiStatusResponse['settings'] }>('/api/ai/settings', {
         method: 'PUT',
