@@ -142,14 +142,14 @@ aiRoutes.post('/chat', async (c) => {
     throw new ApiError(429, 'ai_busy', 'Another AI request is already running')
   }
 
-  let context: { title: string; snippet: string }[] | undefined
+  let context: { noteId: string; title: string; snippet: string }[] | undefined
   if (body.action === 'ask' && (body.message ?? '') !== '') {
     try {
       const retrieval = await searchMcpNotes(
         c.env, userId, new URL(c.req.url).origin, c.get('database').ftsEnabled,
         { query: body.message!, limit: 6, mode: 'auto' },
       )
-      context = retrieval.results.map((hit) => ({ title: hit.title, snippet: hit.snippet }))
+      context = retrieval.results.map((hit) => ({ noteId: hit.id, title: hit.title, snippet: hit.snippet }))
     } catch {
       context = undefined
     }
@@ -186,6 +186,11 @@ aiRoutes.post('/chat', async (c) => {
     async start(controller) {
       let consumed = 0
       try {
+        if (context !== undefined && context.length > 0) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+            sources: context.map((entry, index) => ({ index: index + 1, noteId: entry.noteId, title: entry.title })),
+          })}\n\n`))
+        }
         for await (const delta of provider.stream({ messages })) {
           consumed += delta.length
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`))

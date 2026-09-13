@@ -5,6 +5,7 @@ import { IconButton, Button } from '../../components/primitives';
 import { diffLines } from '../../lib/ai-diff';
 import { useAi } from '../../store/ai';
 import { useActiveNote, useNotes } from '../../store/notes';
+import type { AiChatMessage } from '../../store/ai';
 import { t, useLocale } from '../../lib/i18n';
 import type { MessageKey } from '@shared/locales/en-US';
 import type { AiAction } from '../../lib/ai';
@@ -28,6 +29,23 @@ const QUICK_ACTIONS: readonly { action: AiAction; labelKey: MessageKey }[] = [
 
 /** Right-side AI assistant panel: chat with the current note as context,
  * quick full-note actions, and streaming responses. */
+function renderContent(message: AiChatMessage) {
+    const parts = message.content.split(/(\[\d+\])/g);
+    return parts.map((part, index) => {
+        const citation = /^\[(\d+)\]$/.exec(part);
+        if (citation === null) return <span key={index}>{part}</span>;
+        const source = message.sources?.find((entry) => entry.index === Number(citation[1]));
+        if (source === undefined) return <span key={index}>{part}</span>;
+        return (<button key={index} type="button"
+            title={source.title}
+            className="mx-0.5 rounded-[var(--r-sm)] bg-[var(--accent)]/15 px-1 align-middle text-[11px] text-[var(--accent)] hover:bg-[var(--accent)]/30"
+            onClick={() => void useNotes.getState().openNote(source.noteId)}
+        >
+            {citation[1]}
+        </button>);
+    });
+}
+
 export function AssistantPanel({ onClose }: {
     onClose: () => void;
 }) {
@@ -110,7 +128,7 @@ export function AssistantPanel({ onClose }: {
           {message.error !== undefined
                 ? <span className="text-[var(--danger)]">{t(message.error in AI_ERRORS ? AI_ERRORS[message.error as keyof typeof AI_ERRORS] : "ai.error.unknown")}</span>
                 : message.content !== ''
-                    ? message.content
+                    ? renderContent(message)
                     : <span className="animate-pulse text-[var(--text-quaternary)]">…</span>}
         </div>))}
       </div>

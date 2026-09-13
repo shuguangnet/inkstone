@@ -56,7 +56,7 @@ export function buildChatMessages(input: {
   selection?: string
   history?: readonly AiMessage[]
   userMessage?: string
-  context?: readonly { title: string; snippet: string }[]
+  context?: readonly { noteId?: string; title: string; snippet: string }[]
 }): AiMessage[] {
   const messages: AiMessage[] = [{ role: 'system', content: BASE_SYSTEM }]
   const custom = input.customInstructions?.trim()

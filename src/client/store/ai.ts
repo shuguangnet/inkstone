@@ -24,6 +24,13 @@ export interface AiChatMessage {
   content: string
   action?: AiAction
   error?: string
+  sources?: AiCitationSource[]
+}
+
+export interface AiCitationSource {
+  index: number
+  noteId: string
+  title: string
 }
 
 export interface AiSelection {
@@ -211,7 +218,19 @@ async function consumeStream(body: ReadableStream<Uint8Array>, assistantId: stri
       newline = buffer.indexOf('\n')
       if (!line.startsWith('data:')) continue
       try {
-        const payload = JSON.parse(line.slice(5)) as { delta?: string; done?: boolean; error?: string }
+        const payload = JSON.parse(line.slice(5)) as {
+          delta?: string
+          done?: boolean
+          error?: string
+          sources?: AiCitationSource[]
+        }
+        if (payload.sources) {
+          const { messages } = useAi.getState()
+          useAi.setState({
+            messages: messages.map((message) =>
+              message.id === assistantId ? { ...message, sources: payload.sources } : message),
+          })
+        }
         if (payload.delta) appendDelta(payload.delta)
         if (payload.error) markError(payload.error)
       } catch { /* ignore malformed keep-alive lines */ }
