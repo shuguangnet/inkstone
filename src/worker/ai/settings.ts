@@ -80,8 +80,13 @@ export async function saveAiSettings(
     5_000_000,
   ))
   const enabled = input.enabled ?? current.enabled
-  if (provider === 'openai_compat' && enabled && (!baseUrl || !credential)) {
-    throw new Error('ai_openai_compat_requires_endpoint_and_key')
+  // Local runtimes (e.g. Ollama) expose OpenAI-compatible endpoints without
+  // any key; only the endpoint and model are mandatory.
+  if (provider === 'openai_compat' && enabled && !baseUrl) {
+    throw new Error('ai_openai_compat_requires_endpoint')
+  }
+  if (provider === 'openai_compat' && enabled && !model) {
+    throw new Error('ai_openai_compat_requires_model')
   }
   await env.DB.prepare(
     `INSERT INTO ai_settings

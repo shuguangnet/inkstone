@@ -134,12 +134,18 @@ export interface SyncSettings {
   pollIntervalMs: number
 }
 
+export interface AiUserSettings {
+  /** Free-form instructions appended to every AI assistant system prompt. */
+  customInstructions: string
+}
+
 export interface UserSettings {
   appearance: AppearanceSettings
   editor: EditorSettings
   preview: PreviewSettings
   backup: BackupSettings
   sync: SyncSettings
+  ai: AiUserSettings
 }
 
 

@@ -4,6 +4,7 @@ import { api, type AiStatusResponse } from '../../lib/api'
 import { Button, IconButton } from '../../components/primitives'
 import { Input, SettingRow, Segmented, Switch } from '../../components/form'
 import { useAi } from '../../store/ai'
+import { useSession } from '../../store/session'
 import { t } from '../../lib/i18n'
 
 interface FormState {
@@ -24,6 +25,24 @@ function fromStatus(status: AiStatusResponse | null): FormState {
     apiKey: '',
     dailyCharQuota: status?.settings.dailyCharQuota ?? 50_000,
   }
+}
+
+function UsageBars() {
+    const [days, setDays] = useState<Array<{ day: string; chars: number; requests: number }> | null>(null);
+    useEffect(() => {
+        api.ai.usage().then((result) => setDays(result.days)).catch(() => setDays([]));
+    }, []);
+    if (days === null || days.length === 0) return null;
+    const max = Math.max(...days.map((day) => day.chars), 1);
+    return (<div className="mt-2 space-y-1">
+      {days.map((day) => (<div key={day.day} className="flex items-center gap-2 text-[10.5px] text-[var(--text-quaternary)]">
+        <span className="w-[70px] tabular">{day.day.slice(5)}</span>
+        <span className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--bg-hover)]">
+          <span className="block h-full rounded-full bg-[var(--accent)]" style={{ width: `${Math.max(2, Math.round((day.chars / max) * 100))}%` }}/>
+        </span>
+        <span className="w-24 text-right tabular">{day.chars} · {day.requests}×</span>
+      </div>))}
+    </div>)
 }
 
 export function AiSettings() {
@@ -90,6 +109,9 @@ export function AiSettings() {
     }
   }
 
+  const sessionSettings = useSession((s) => s.settings)
+  const updateSettings = useSession((s) => s.updateSettings)
+
   if (!loaded) return null
   const openai = form.provider === 'openai_compat'
 
@@ -118,7 +140,7 @@ export function AiSettings() {
         <SettingRow title={t("settings.ai_base_url")}>
           <Input
             value={form.baseUrl}
-            placeholder="https://api.openai.com/v1"
+            placeholder="https://api.openai.com/v1  (Ollama: http://localhost:11434/v1)"
             className="w-[260px]"
             onChange={(event) => setForm((current) => ({ ...current, baseUrl: event.target.value }))}
             onBlur={() => void save({})}
@@ -126,7 +148,7 @@ export function AiSettings() {
         </SettingRow>
         <SettingRow
           title={t("settings.ai_api_key")}
-          description={status?.settings.hasKey ? t("settings.ai_api_key_stored") : t("settings.ai_api_key_hint")}
+          description={status?.settings.hasKey ? t("settings.ai_api_key_stored") : t("settings.ai_api_key_optional")}
         >
           <Input
             type="password"
@@ -175,6 +197,20 @@ export function AiSettings() {
         </select>
       </SettingRow>)}
 
+      <SettingRow
+        title={t("settings.ai_custom_instructions")}
+        description={t("settings.ai_custom_instructions_hint")}
+      >
+        <textarea
+          rows={3}
+          maxLength={2_000}
+          value={sessionSettings.ai.customInstructions}
+          placeholder={t("settings.ai_custom_instructions_placeholder")}
+          className="w-[320px] resize-y rounded-[var(--r-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--accent)]"
+          onChange={(event) => void updateSettings({ ai: { customInstructions: event.target.value } })}
+        />
+      </SettingRow>
+
       <SettingRow title={t("settings.ai_quota")} description={t("settings.ai_quota_description")}>
         <Input
           type="number"
@@ -195,6 +231,7 @@ export function AiSettings() {
           ? `${status.usage.usedChars} / ${status.usage.quotaChars} ${t("ai.panel.quota_chars")}`
           : t("settings.ai_usage_unknown")}
       </p>
+      <UsageBars/>
       <p className="mt-2 flex items-center gap-1.5 text-xs text-[var(--text-quaternary)]">
         <Bot size={12}/>{t("settings.ai_privacy_note")}
         <Sparkles size={12}/>{t("settings.ai_proxy_note")}

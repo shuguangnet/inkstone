@@ -49,6 +49,7 @@ export function actionInstruction(action: AiAction): string {
 }
 
 export function buildChatMessages(input: {
+  customInstructions?: string
   action: AiAction
   noteTitle?: string
   noteContent?: string
@@ -58,6 +59,13 @@ export function buildChatMessages(input: {
   context?: readonly { title: string; snippet: string }[]
 }): AiMessage[] {
   const messages: AiMessage[] = [{ role: 'system', content: BASE_SYSTEM }]
+  const custom = input.customInstructions?.trim()
+  if (custom) {
+    messages.push({
+      role: 'system',
+      content: `The account owner adds these standing instructions: ${custom.slice(0, 2_000)}`,
+    })
+  }
   const instruction = actionInstruction(input.action)
   if (instruction) messages.push({ role: 'system', content: instruction })
   if (input.noteContent !== undefined) {
