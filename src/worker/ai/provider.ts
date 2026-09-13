@@ -52,18 +52,17 @@ export class WorkersAiProvider implements AiProvider {
 export class OpenAiCompatProvider implements AiProvider {
   readonly id = 'openai_compat' as const
   constructor(
-    private readonly apiKey: string,
+    private readonly apiKey: string | null,
     private readonly baseUrl: string,
     readonly model: string,
   ) {}
 
   async *stream(request: AiChatRequest): AiStream {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (this.apiKey !== null) headers.Authorization = `Bearer ${this.apiKey}`
     const response = await fetch(`${this.baseUrl.replace(/\/+$/, '')}/chat/completions`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
+      headers,
       body: JSON.stringify({
         model: this.model,
         messages: request.messages,

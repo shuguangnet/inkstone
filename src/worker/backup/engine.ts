@@ -15,8 +15,10 @@ import { acquireLease } from '../lib/lease'
 import { buildSnapshot, type Snapshot } from './snapshot'
 import { friendlyError, isTransientBackupError } from './common'
 import { forEachConcurrent } from './concurrency'
-import { s3Deliver, s3Test, type S3Secret } from './s3'
-import { webdavDeliver, webdavTest, type WebdavSecret } from './webdav'
+import { s3Deliver, s3DeliverArchive, s3Test, type S3Secret } from './s3'
+import { encryptArchive } from './archive-crypto'
+import { webdavDeliver, webdavDeliverArchive, webdavTest, type WebdavSecret } from './webdav'
+import { createBackupArchive } from './archive'
 
 export interface TargetRow {
   id: string
@@ -197,10 +199,24 @@ async function deliverToTarget(
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), targetTimeoutMs(snapshot))
       try {
-        const outcome =
-          target.type === 's3'
+        const passphrase = typeof (secret as { backupPassphrase?: unknown }).backupPassphrase === 'string'
+          ? (secret as { backupPassphrase: string }).backupPassphrase
+          : null
+        const deliver = async () => {
+          if (passphrase !== null) {
+            const encrypted = await encryptArchive(
+              createBackupArchive(snapshot),
+              passphrase,
+            )
+            return target.type === 's3'
+              ? await s3DeliverArchive(config, secret, encrypted, snapshot.stamp, controller.signal)
+              : await webdavDeliverArchive(config, secret, encrypted, controller.signal)
+          }
+          return target.type === 's3'
             ? await s3Deliver(config, secret, snapshot, controller.signal)
             : await webdavDeliver(config, secret, snapshot, controller.signal)
+        }
+        const outcome = await deliver()
         return { ...base, ok: true, files: outcome.files, bytes: outcome.bytes, ms: Date.now() - started, error: null }
       } catch (error) {
         if (attempt > 0 || !isTransientBackupError(error)) throw error

@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test:unit
+      - run: npm run i18n:check
+      - run: npm run comments:check
+      - run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    continue-on-error: true # workerd-in-docker stability is being tracked; failures are reported but not blocking
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build:vps
+      - name: Start local runtime
+        env:
+          INKSTONE_DATA_DIR: ${{ runner.temp }}/inkstone-data
+          INKSTONE_PUBLIC_URL: http://localhost:7712
+          INKSTONE_SCHEDULE_TOKEN: ci-local-token-0123456789abcdefabcdef
+        run: |
+          npm run start:vps &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:7712/api/health && exit 0
+            sleep 2
+          done
+          exit 1
+      - run: npm run test:e2e

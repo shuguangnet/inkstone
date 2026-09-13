@@ -299,6 +299,8 @@ export const api = {
     request<{ tasks: AggregatedTask[] }>('/api/tasks', { signal }),
   ai: {
     status: (signal?: AbortSignal) => request<AiStatusResponse>('/api/ai/status', { signal }),
+    usage: (signal?: AbortSignal) =>
+      request<{ days: Array<{ day: string; chars: number; requests: number }> }>('/api/ai/usage', { signal }),
     models: (signal?: AbortSignal) =>
       request<{ models: string[]; source: 'curated' | 'endpoint' }>('/api/ai/models', { signal }),
     saveSettings: (input: AiSettingsUpdate) =>

@@ -8,7 +8,7 @@ const MAX_CIPHERTEXT_LENGTH = 24 * 1024
 const CREDENTIAL_SCOPE_PATTERN = /^(?:backup|totp|ai):[0-9a-hjkmnp-tv-z]{26}$/
 const CIPHERTEXT_PATTERN = /^v1\.([A-Za-z0-9_-]+)$/
 const HKDF_SALT = utf8('inkstone.backup-credentials.v1')
-const BACKUP_SECRET_FIELDS = new Set(['password', 'accessKeyId', 'secretAccessKey'])
+const BACKUP_SECRET_FIELDS = new Set(['password', 'accessKeyId', 'secretAccessKey', 'backupPassphrase'])
 const TOTP_SECRET_FIELDS = new Set(['secret'])
 const AI_SECRET_FIELDS = new Set(['apiKey'])
 

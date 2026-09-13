@@ -1,6 +1,6 @@
 import type { TestConnectionResult, WebdavConfig } from '@shared/types'
 import type { Snapshot } from './snapshot'
-import { backupArchivePath, createBackupArchive } from './archive'
+import { createBackupArchive, type BackupArchive } from './archive'
 import {
   BACKUP_USER_AGENT,
   friendlyError,
@@ -120,14 +120,21 @@ export async function webdavDeliver(
   snapshot: Snapshot,
   signal?: AbortSignal,
 ): Promise<DeliverResult> {
+  return webdavDeliverArchive(config, secret, createBackupArchive(snapshot), signal)
+}
+
+export async function webdavDeliverArchive(
+  config: WebdavConfig,
+  secret: WebdavSecret,
+  archive: BackupArchive,
+  signal?: AbortSignal,
+): Promise<DeliverResult> {
   const base = baseUrl(config)
   const auth = authHeader(config, secret)
   const prefix = normalizeBackupPrefix(config.prefix ?? '')
-  const target = [prefix, backupArchivePath(snapshot)].filter(Boolean).join('/')
+  const target = [prefix, `backups/${archive.filename}`].filter(Boolean).join('/')
   const targetDir = target.slice(0, target.lastIndexOf('/'))
   await ensureDirs(base, auth, targetDir ? [targetDir] : [], new Set(), signal)
-
-  const archive = createBackupArchive(snapshot)
   if (await webdavObjectMatches(base, auth, target, archive.byteLengthNumber, signal)) {
     await archive.stream.cancel().catch(() => {})
     return { files: 1, bytes: archive.byteLengthNumber }

@@ -92,6 +92,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
   backup: {
     schedule: 'sixHourly',
   },
+  ai: {
+    customInstructions: '',
+  },
   sync: {
     realtime: true,
     pollIntervalMs: 15_000,
@@ -125,6 +128,7 @@ export function mergeSettings(partial: unknown): UserSettings {
   const preview = asRecord(src.preview)
   const backup = asRecord(src.backup)
   const sync = asRecord(src.sync)
+  const ai = asRecord(src.ai)
 
   base.appearance.theme = enumValue(appearance.theme, THEMES, base.appearance.theme)
   base.appearance.language = enumValue(
@@ -208,6 +212,10 @@ export function mergeSettings(partial: unknown): UserSettings {
     base.sync.pollIntervalMs,
   )
 
+  base.ai.customInstructions = typeof ai.customInstructions === 'string'
+    ? ai.customInstructions.slice(0, 2_000)
+    : base.ai.customInstructions
+
   return base
 }
 
@@ -216,7 +224,7 @@ export function mergeSettingsPatch(current: unknown, patch: unknown): UserSettin
   const previous = asRecord(current)
   const incoming = asRecord(patch)
   const combined: Record<string, unknown> = { ...previous }
-  for (const section of ['appearance', 'editor', 'preview', 'backup', 'sync'] as const) {
+  for (const section of ['appearance', 'editor', 'preview', 'backup', 'sync', 'ai'] as const) {
     combined[section] = {
       ...asRecord(previous[section]),
       ...asRecord(incoming[section]),
@@ -232,6 +240,7 @@ function cloneDefaultSettings(): UserSettings {
     preview: { ...DEFAULT_SETTINGS.preview },
     backup: { ...DEFAULT_SETTINGS.backup },
     sync: { ...DEFAULT_SETTINGS.sync },
+    ai: { ...DEFAULT_SETTINGS.ai },
   }
 }
 

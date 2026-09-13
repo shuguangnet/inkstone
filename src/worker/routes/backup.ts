@@ -5,6 +5,7 @@ import type { BackupRun, BackupTargetInput, BackupTargetPatchInput, BackupTarget
 import type { AppBindings } from '../env'
 import { runBackup, testTarget, toBackupTarget, type TargetRow } from '../backup/engine'
 import { fetchBackupArchive } from '../backup/restore'
+import { decryptArchiveBytes } from '../backup/archive-crypto'
 import { importBackupZipBytes } from './transfer'
 import { formatStamp } from '../backup/snapshot'
 import type { BackupTargetConfig } from '@shared/types'
@@ -180,7 +181,7 @@ backupRoutes.post('/test', async (c) => {
  * restores it through the standard import path. */
 backupRoutes.post('/restore', async (c) => {
   const userId = c.get('userId')
-  const body = await readJson<{ targetId?: unknown; stamp?: unknown }>(c, JSON_BODY_LIMITS.small)
+  const body = await readJson<{ targetId?: unknown; stamp?: unknown; merge?: unknown }>(c, JSON_BODY_LIMITS.small)
   if (typeof body?.targetId !== 'string' || !isValidId(body.targetId)) {
     throw ApiError.badRequest('Missing targetId')
   }
@@ -209,8 +210,12 @@ backupRoutes.post('/restore', async (c) => {
   if (secret === null) throw new BackupConfigError('The target credentials are unavailable')
 
   const bytes = await fetchBackupArchive(config, secret, stamp)
+  const archivePassphrase = typeof (secret as { backupPassphrase?: unknown }).backupPassphrase === 'string'
+    ? (secret as { backupPassphrase: string }).backupPassphrase
+    : null
+  const decrypted = await decryptArchiveBytes(bytes, archivePassphrase)
   const { ftsEnabled } = c.get('database')
-  const result = await importBackupZipBytes(c, userId, bytes, 'newer', ftsEnabled)
+  const result = await importBackupZipBytes(c, userId, decrypted, body.merge === true ? 'merge' : 'newer', ftsEnabled)
   return c.json({ restored: true, stamp, result })
 })
 
@@ -359,7 +364,9 @@ function mergeSecret(
 
 function pickSecret(body: BackupTargetInput): Record<string, string> {
   const out: Record<string, string> = {}
-  const keys = body.type === 's3' ? ['accessKeyId', 'secretAccessKey'] : ['password']
+  const keys = body.type === 's3'
+    ? ['accessKeyId', 'secretAccessKey', 'backupPassphrase']
+    : ['password', 'backupPassphrase']
   for (const k of keys) {
     const v = body.secret?.[k as keyof NonNullable<BackupTargetInput['secret']>]
     if (typeof v === 'string' && v.trim()) out[k] = v

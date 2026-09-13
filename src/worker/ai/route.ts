@@ -73,13 +73,13 @@ aiRoutes.get('/models', async (c) => {
     return c.json({ models: WORKERS_AI_CHAT_MODELS, source: 'curated' })
   }
   const apiKey = await loadAiApiKey(c.env, userId)
-  if (!apiKey || settings.baseUrl === '') {
+  if (settings.baseUrl === '') {
     throw new ApiError(409, 'ai_not_configured', 'Save an endpoint and API key first')
   }
   let response: Response
   try {
     response = await fetch(`${settings.baseUrl.replace(/\/+$/, '')}/models`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
+      headers: apiKey === null ? {} : { Authorization: `Bearer ${apiKey}` },
     })
   } catch {
     throw new ApiError(502, 'ai_unavailable', 'Could not reach the model endpoint')
@@ -103,11 +103,23 @@ aiRoutes.put('/settings', async (c) => {
     return c.json({ ok: true, settings: { ...settings } })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'ai_settings_invalid'
-    if (message === 'ai_openai_compat_requires_endpoint_and_key') {
-      throw ApiError.badRequest('OpenAI-compatible providers need an endpoint and an API key')
+    if (message === 'ai_openai_compat_requires_endpoint') {
+      throw ApiError.badRequest('OpenAI-compatible providers need an endpoint')
+    }
+    if (message === 'ai_openai_compat_requires_model') {
+      throw ApiError.badRequest('OpenAI-compatible providers need a model')
     }
     throw ApiError.badRequest('Invalid AI settings payload')
   }
+})
+
+aiRoutes.get('/usage', async (c) => {
+  const userId = c.get('userId')
+  const since = new Date(Date.now() - 13 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const { results } = await c.env.DB.prepare(
+    'SELECT day, chars, requests FROM ai_usage WHERE user_id = ?1 AND day >= ?2 ORDER BY day ASC',
+  ).bind(userId, since).all<{ day: string; chars: number; requests: number }>()
+  return c.json({ days: results ?? [] })
 })
 
 aiRoutes.post('/chat', async (c) => {
@@ -130,20 +142,27 @@ aiRoutes.post('/chat', async (c) => {
     throw new ApiError(429, 'ai_busy', 'Another AI request is already running')
   }
 
-  let context: { title: string; snippet: string }[] | undefined
+  let context: { noteId: string; title: string; snippet: string }[] | undefined
   if (body.action === 'ask' && (body.message ?? '') !== '') {
     try {
       const retrieval = await searchMcpNotes(
         c.env, userId, new URL(c.req.url).origin, c.get('database').ftsEnabled,
         { query: body.message!, limit: 6, mode: 'auto' },
       )
-      context = retrieval.results.map((hit) => ({ title: hit.title, snippet: hit.snippet }))
+      context = retrieval.results.map((hit) => ({ noteId: hit.id, title: hit.title, snippet: hit.snippet }))
     } catch {
       context = undefined
     }
   }
 
+  const userSettings = asRecord(safeParseJson(c.get('user').settingsRaw))
+  const userAi = asRecord(userSettings.ai)
+  const customInstructions = typeof userAi.customInstructions === 'string'
+    ? userAi.customInstructions
+    : undefined
+
   const messages = buildChatMessages({
+    customInstructions,
     action: body.action,
     context,
     noteTitle: body.noteTitle,
@@ -167,6 +186,11 @@ aiRoutes.post('/chat', async (c) => {
     async start(controller) {
       let consumed = 0
       try {
+        if (context !== undefined && context.length > 0) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+            sources: context.map((entry, index) => ({ index: index + 1, noteId: entry.noteId, title: entry.title })),
+          })}\n\n`))
+        }
         for await (const delta of provider.stream({ messages })) {
           consumed += delta.length
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`))
@@ -195,6 +219,17 @@ aiRoutes.post('/chat', async (c) => {
   })
 })
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+}
+
+function safeParseJson(text: string | undefined): unknown {
+  if (!text) return null
+  try { return JSON.parse(text) } catch { return null }
+}
+
 function aiAvailable(env: AppBindings['Bindings'], settings: {
   enabled: boolean
   provider: string
@@ -204,7 +239,7 @@ function aiAvailable(env: AppBindings['Bindings'], settings: {
 }): boolean {
   if (!settings.enabled) return false
   if (settings.provider === 'workers_ai') return Boolean(env.AI)
-  return settings.hasKey && settings.baseUrl !== '' && settings.model !== ''
+  return settings.baseUrl !== '' && settings.model !== ''
 }
 
 export async function resolveProvider(
@@ -217,7 +252,7 @@ export async function resolveProvider(
     return new WorkersAiProvider(env.AI, settings.model)
   }
   const apiKey = await loadAiApiKey(env, userId)
-  if (!apiKey || !settings.baseUrl || !settings.model) {
+  if (!settings.baseUrl || !settings.model) {
     throw new ApiError(409, 'ai_not_configured', 'OpenAI-compatible provider is not fully configured')
   }
   return new OpenAiCompatProvider(apiKey, settings.baseUrl, settings.model)

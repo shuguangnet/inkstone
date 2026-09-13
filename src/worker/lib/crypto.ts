@@ -114,7 +114,7 @@ function readStringField(value: unknown, key: string): string | null {
 
 function isBackupCredentialRecord(value: unknown): value is Record<string, string> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
-  const allowed = new Set(['password', 'accessKeyId', 'secretAccessKey'])
+  const allowed = new Set(['password', 'accessKeyId', 'secretAccessKey', 'backupPassphrase'])
   const entries = Object.entries(value)
   return entries.length > 0 &&
     entries.length <= allowed.size &&
