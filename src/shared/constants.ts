@@ -22,7 +22,6 @@ export const LIMITS = {
   folderDepthMax: 12,
   attachmentMaxBytes: 25 * 1024 * 1024,
   attachmentQuotaBytes: 1024 * 1024 * 1024,
-  attachmentUploadsPerHour: 100,
   importFilesMax: 500,
   importUploadMaxBytes: 64 * 1024 * 1024,
   importBundleMaxBytes: 32 * 1024 * 1024,

@@ -19,7 +19,6 @@ import { ApiError } from '../lib/errors'
 import { isValidId, isValidSlug, newId } from '../lib/id'
 import { isInlineSafe } from '../lib/image'
 import { FORM_BODY_LIMITS, readFormDataWithinLimit } from '../lib/request'
-import { consumeAttemptBudget, ThrottleError } from '../lib/throttle'
 import { shareAssetCookieName, verifyShareAssetSession } from '../lib/share-asset-session'
 import { requireAuth } from '../middleware/auth'
 
@@ -142,25 +141,6 @@ async function collectAttachmentIdsThroughBoundary(
 
 filesRoutes.post('/', requireAuth, async (c) => {
   const userId = c.get('userId')
-  try {
-    await consumeAttemptBudget(c.env.DB, [{
-      key: `attachment-upload:${userId}`,
-      maxAttempts: LIMITS.attachmentUploadsPerHour,
-      windowMs: 60 * 60 * 1000,
-      lockMs: 60 * 60 * 1000,
-    }])
-  } catch (error) {
-    if (error instanceof ThrottleError) {
-      throw new ApiError(
-        429,
-        'too_many_attempts',
-        `Too many uploads. Try again in ${error.retryAfterSec} seconds`,
-        { retryAfter: error.retryAfterSec },
-      )
-    }
-    throw error
-  }
-
   const form = await readFormDataWithinLimit(c.req, FORM_BODY_LIMITS.attachment)
 
   const file = form.get('file')
