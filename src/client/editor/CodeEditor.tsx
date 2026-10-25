@@ -14,12 +14,14 @@ import { codeFenceSource, tagSource, wikiLinkSource, type CompletionSources } fr
 import { pasteExtension, type PasteHandlers } from './paste';
 import { completeCodeFenceOnEnter, setHeading, smartEnter, tableTab, toggleBold, toggleBulletList, toggleHighlight, toggleInlineCode, toggleItalic, toggleOrderedList, toggleQuote, toggleStrikethrough, toggleTaskDone, toggleTaskList, } from './commands';
 import { t } from "../lib/i18n";
+import { livePreview, livePreviewOptions, type LivePreviewOptions } from './live-preview';
 
 const externalValueUpdate = Annotation.define<boolean>();
 export interface CodeEditorProps {
     value: string;
     onChange: (value: string) => void;
     settings: EditorSettings;
+    previewOptions?: LivePreviewOptions;
     sources: CompletionSources;
     handlers: PasteHandlers;
     onReady?: (view: EditorView | null) => void;
@@ -28,7 +30,7 @@ export interface CodeEditorProps {
     placeholder?: string;
     className?: string;
 }
-export function CodeEditor({ value, onChange, settings, sources, handlers, onReady, onScroll, onCursorLine, placeholder = t("editor.start_writing"), className, }: CodeEditorProps) {
+export function CodeEditor({ value, onChange, settings, previewOptions = { math: true, mermaid: true }, sources, handlers, onReady, onScroll, onCursorLine, placeholder = t("editor.start_writing"), className, }: CodeEditorProps) {
     const hostRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
 
@@ -38,6 +40,7 @@ export function CodeEditor({ value, onChange, settings, sources, handlers, onRea
     const lineNumbersCompartment = useRef(new Compartment());
     const tabSizeCompartment = useRef(new Compartment());
     const placeholderCompartment = useRef(new Compartment());
+    const livePreviewCompartment = useRef(new Compartment());
 
     useEffect(() => {
         const host = hostRef.current;
@@ -76,6 +79,7 @@ export function CodeEditor({ value, onChange, settings, sources, handlers, onRea
             }),
             editorTheme(),
             markdownDecorations,
+            livePreviewCompartment.current.of(settings.livePreview ? [livePreviewOptions.of(previewOptions), livePreview] : []),
             focusModePlugin,
             typewriterPlugin,
             pasteExtension(cbRef.current.handlers),
@@ -139,6 +143,10 @@ export function CodeEditor({ value, onChange, settings, sources, handlers, onRea
     }, []);
 
     useEffect(() => {
+        viewRef.current?.dispatch({ effects: livePreviewCompartment.current.reconfigure(settings.livePreview ? [livePreviewOptions.of(previewOptions), livePreview] : []) });
+    }, [settings.livePreview, previewOptions.math, previewOptions.mermaid]);
+
+    useEffect(() => {
         const view = viewRef.current;
         if (!view) return;
         view.dispatch({
@@ -194,5 +202,5 @@ export function CodeEditor({ value, onChange, settings, sources, handlers, onRea
     useEffect(() => {
         viewRef.current?.dispatch({ effects: setFocusMode.of(settings.focusMode) });
     }, [settings.focusMode]);
-    return (<div ref={hostRef} className={cn('ink-editor', className)} data-family={settings.fontFamily} data-focus-mode={settings.focusMode} data-typewriter={settings.typewriter}/>);
+    return (<div ref={hostRef} className={cn('ink-editor', className)} data-family={settings.fontFamily} data-live-preview={settings.livePreview} data-focus-mode={settings.focusMode} data-typewriter={settings.typewriter}/>);
 }

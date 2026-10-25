@@ -1,4 +1,9 @@
 export const EN_US_MESSAGES = {
+    "editor.live_preview": "Live preview",
+    "editor.show_source": "Show Markdown source",
+    "editor.live_preview_hint": "Render Markdown directly as you write. Click formatted blocks to edit them.",
+    "editor.edit_rendered": "Click to edit this block",
+    "editor.toggle_task": "Toggle task completion",
     "writing.immersive": "Immersive writing",
     "writing.exit": "Exit immersive writing",
     "writing.focus": "Paragraph focus",

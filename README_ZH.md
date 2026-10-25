@@ -162,6 +162,8 @@ Inkstone 使用 [GNU Lesser General Public License v3.0 only](./LICENSE)，SPDX 
 
 ## 沉浸式写作与服务器 AI 终端
 
+编辑器默认启用即时渲染，标题、行内格式、列表、表格、图片、代码和公式直接在输入区呈现。点击已渲染的内容即可编辑，可直接勾选任务，也可在工具栏随时切换 Markdown 源码。笔记仍以 Markdown 保存。
+
 使用编辑器的沉浸式写作按钮或 `Ctrl/Cmd+Shift+E` 隐藏导航并居中写作，`Esc` 退出。站长登录后，编辑器和 AI 辅助面板一键自动连接服务器终端，无需填写地址或配对令牌，接入 Claude Code、Codex、PyAgent、DSH 及自定义命令，并支持当前笔记导出、文件路径引入、修改预览和确认写回。
 
 终端需要独立部署 Node 连接服务与 WSS 代理，详见 [配置和使用说明](WRITING_WORKSPACE_ZH.md)。

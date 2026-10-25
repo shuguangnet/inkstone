@@ -1,5 +1,10 @@
 import type { MessageKey } from './en-US';
 export const ZH_CN_MESSAGES = {
+    "editor.live_preview": "即时渲染",
+    "editor.show_source": "显示 Markdown 源码",
+    "editor.live_preview_hint": "边写边显示排版效果，点击已渲染的内容即可继续编辑。",
+    "editor.edit_rendered": "点击编辑此内容",
+    "editor.toggle_task": "切换任务完成状态",
     "writing.immersive": "沉浸式写作",
     "writing.exit": "退出沉浸式写作",
     "writing.focus": "段落聚焦",

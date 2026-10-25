@@ -8,6 +8,10 @@ export function EditorSettings() {
     const preview = settings.preview;
     return (<div className="space-y-6">
       <section>
+        <SettingRow title={t('editor.live_preview')} description={t('editor.live_preview_hint')}>
+          <Switch checked={editor.livePreview} onChange={(livePreview) => void update({ editor: { livePreview } })} label={t('editor.live_preview')}/>
+        </SettingRow>
+
         <SettingRow title={t("settings.editor_font")}>
           <Segmented<'mono' | 'sans'> label={t("settings.editor_font")} value={editor.fontFamily} onChange={(fontFamily) => void update({ editor: { fontFamily } })} options={[
             { value: 'mono', label: t("settings.monospace") },

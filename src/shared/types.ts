@@ -104,6 +104,7 @@ export interface AppearanceSettings {
 }
 
 export interface EditorSettings {
+  livePreview: boolean
   fontSize: number
   fontFamily: 'mono' | 'sans'
   lineNumbers: boolean

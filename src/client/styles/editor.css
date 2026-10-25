@@ -435,3 +435,92 @@
 .immersive-workspace .ink-editor .cm-line {
   padding-inline: 28px;
 }
+
+.ink-editor[data-live-preview='true'] .cm-editor {
+  font-family: var(--font-ui);
+  line-height: var(--prose-line, 1.75);
+}
+.ink-editor[data-live-preview='true'] .cm-md-h1,
+.ink-editor[data-live-preview='true'] .cm-md-h2,
+.ink-editor[data-live-preview='true'] .cm-md-h3,
+.ink-editor[data-live-preview='true'] .cm-md-h4,
+.ink-editor[data-live-preview='true'] .cm-md-h5,
+.ink-editor[data-live-preview='true'] .cm-md-h6 {
+  padding-block: 0.5em 0.22em;
+}
+.ink-editor[data-live-preview='true'] .cm-md-code {
+  background: var(--bg-inset);
+  border-radius: 4px;
+  padding-block: 0.12em;
+}
+.cm-live-highlight {
+  background: var(--accent-soft);
+  border-radius: 3px;
+}
+.ink-editor .cm-line.cm-live-quote {
+  border-left: 3px solid var(--accent);
+  background: var(--bg-inset);
+  color: var(--text-secondary);
+}
+.cm-live-list-marker {
+  display: inline-block;
+  min-width: 1.3em;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.cm-live-task {
+  width: 1em;
+  height: 1em;
+  margin-inline-end: 0.4em;
+  accent-color: var(--accent);
+  cursor: pointer;
+  vertical-align: -0.1em;
+}
+.cm-live-rendered.ink-prose {
+  font-size: inherit;
+  line-height: inherit;
+  max-width: none;
+  margin: 0;
+  padding-block: 0;
+  white-space: normal;
+  cursor: text;
+}
+.cm-live-rendered:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.cm-live-block {
+  padding-inline: 16px;
+  overflow-x: auto;
+}
+.cm-live-inline {
+  display: inline;
+}
+.cm-live-inline img {
+  display: block;
+  max-width: 100%;
+  max-height: 480px;
+  height: auto;
+  margin-block: 0.6em;
+  border-radius: var(--r-md);
+}
+.cm-live-inline .math-inline {
+  display: inline;
+}
+.cm-live-block .code-block {
+  margin-block: 0.5em;
+}
+.cm-live-block .code-block-toolbar {
+  pointer-events: none;
+}
+.ink-editor .cm-live-table-source {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  background: var(--bg-inset);
+}
+.immersive-workspace .cm-live-block {
+  padding-inline: 28px;
+}
+.ink-editor[data-focus-mode='true'] .cm-live-block {
+  opacity: 0.32;
+}

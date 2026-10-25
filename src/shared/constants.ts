@@ -69,6 +69,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
     proseLineHeight: 1.65,
   },
   editor: {
+    livePreview: true,
     fontSize: 15,
     fontFamily: 'mono',
     lineNumbers: false,
@@ -80,7 +81,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
     autoSaveDelay: 500,
   },
   preview: {
-    layout: 'split',
+    layout: 'edit',
     syncScroll: true,
     showToc: true,
     math: true,
@@ -170,6 +171,7 @@ export function mergeSettings(partial: unknown): UserSettings {
   )
 
   base.editor.fontSize = integerInRange(editor.fontSize, 12, 22, base.editor.fontSize)
+  base.editor.livePreview = booleanValue(editor.livePreview, base.editor.livePreview)
   base.editor.fontFamily = enumValue(editor.fontFamily, EDITOR_FONTS, base.editor.fontFamily)
   base.editor.lineNumbers = booleanValue(editor.lineNumbers, base.editor.lineNumbers)
   base.editor.typewriter = booleanValue(editor.typewriter, base.editor.typewriter)

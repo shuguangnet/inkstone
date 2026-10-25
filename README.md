@@ -161,6 +161,8 @@ Inkstone is distributed under the [GNU Lesser General Public License v3.0 only](
 
 ## Immersive writing and server AI terminal
 
+The editor renders Markdown in place as you write, including headings, inline formatting, lists, tables, images, code, and math. Click rendered blocks to edit them, toggle tasks directly, or switch to Markdown source from the toolbar. Notes remain stored as Markdown.
+
 Use the editor button or `Ctrl/Cmd+Shift+E` to enter immersive writing, and `Esc` to exit. Open the server terminal from the editor or AI panel with one click using the signed-in owner session, with no address or pairing token to enter. Run Claude Code, Codex, PyAgent, DSH, or custom commands. Export the current note, insert its file path, preview file changes, and explicitly apply them back to the editor with conflict protection.
 
 The terminal requires a separately deployed Node bridge and WSS reverse proxy. See the [deployment and usage guide (Chinese)](WRITING_WORKSPACE_ZH.md).

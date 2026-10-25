@@ -383,6 +383,11 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
         </div>
 
         <div className="flex shrink-0 items-center gap-0.5">
+          {showEditor && <Tooltip label={t(settings.editor.livePreview ? 'editor.show_source' : 'editor.live_preview')}>
+            <IconButton size="sm" label={t(settings.editor.livePreview ? 'editor.show_source' : 'editor.live_preview')} active={settings.editor.livePreview} onClick={() => void updateSettings({ editor: { livePreview: !settings.editor.livePreview } })}>
+              {settings.editor.livePreview ? <Eye size={14}/> : <FileCode size={14}/>}
+            </IconButton>
+          </Tooltip>}
           {!isMobile && <>
             <Tooltip label={t(immersive ? 'writing.exit' : 'writing.immersive')} combo="mod+shift+e">
               <IconButton size="sm" label={t(immersive ? 'writing.exit' : 'writing.immersive')} active={immersive} onClick={toggleImmersive}>
@@ -485,7 +490,7 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div ref={containerRef} className="flex min-h-0 flex-1">
         {showEditor && (<div className="min-w-0" style={{ width: layout === 'split' ? editorWidth : '100%' }}>
-            <CodeEditor key={note.id} value={content} onChange={onChange} settings={immersive ? { ...settings.editor, lineNumbers: false } : settings.editor} sources={sources} handlers={handlers} onReady={setView}/>
+            <CodeEditor key={note.id} value={content} onChange={onChange} settings={immersive ? { ...settings.editor, lineNumbers: false } : settings.editor} previewOptions={settings.preview} sources={sources} handlers={handlers} onReady={setView}/>
           </div>)}
 
         {layout === 'split' && (<SplitResizer label={t("workspace.resize_editor_and_preview_panes")} containerRef={containerRef} ratio={effectiveSplitRatio} onChange={(splitRatio) => setLayout({ splitRatio })} onReset={() => setLayout({ splitRatio: null })}/>)}
