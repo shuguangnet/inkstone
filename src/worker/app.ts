@@ -33,8 +33,9 @@ export function createApp() {
     const isHttps = new URL(c.req.url).protocol === 'https:'
     const imageSchemes = isHttps ? 'https:' : 'https: http:'
     const formAction = authorizationFormAction(c.req.url, c.res)
+    const diagramViewer = ['/drawio-viewer', '/drawio-viewer.html'].includes(c.req.path)
     c.header('X-Content-Type-Options', 'nosniff')
-    c.header('X-Frame-Options', c.req.path === '/drawio-viewer.html' ? 'SAMEORIGIN' : 'DENY')
+    c.header('X-Frame-Options', diagramViewer ? 'SAMEORIGIN' : 'DENY')
     c.header('Referrer-Policy', 'strict-origin-when-cross-origin')
     c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
     c.header(
@@ -42,7 +43,7 @@ export function createApp() {
         "default-src 'self'; base-uri 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
         `img-src 'self' data: blob: ${imageSchemes}; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; ` +
         `manifest-src 'self'; media-src 'self' blob:; form-action ${formAction}; frame-src 'self'; ` +
-        `frame-ancestors ${c.req.path === '/drawio-viewer.html' ? "'self'" : "'none'"}; object-src 'none'`,
+        `frame-ancestors ${diagramViewer ? "'self'" : "'none'"}; object-src 'none'`,
     )
     if (isHttps) {
       c.header('Strict-Transport-Security', 'max-age=31536000')
