@@ -10,7 +10,7 @@ WorkingDirectory=/opt/inkstone
 Environment=HOME=/var/lib/inkstone-terminal
 Environment=PATH=/var/lib/inkstone-terminal/.local/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=/etc/inkstone-terminal.env
-ExecStart=/usr/bin/node /opt/inkstone/scripts/local-terminal.mjs --origin ${INKSTONE_TERMINAL_ORIGIN} --workspace /var/lib/inkstone-terminal/writing
+ExecStart=/usr/bin/node /opt/inkstone/scripts/local-terminal.mjs --origin ${INKSTONE_TERMINAL_ORIGIN} --workspace /var/lib/inkstone-terminal/writing --authorize-url http://127.0.0.1:7712/api/terminal/authorize
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=10

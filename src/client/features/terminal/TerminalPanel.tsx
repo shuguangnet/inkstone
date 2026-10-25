@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { X } from 'lucide-react';
@@ -8,18 +8,16 @@ import { useActiveNote, useNotes } from '../../store/notes';
 import { useTerminal } from '../../store/terminal';
 import { t, useLocale } from '../../lib/i18n';
 import { diffLines } from '../../lib/ai-diff';
-import { canApplyTerminalFile, quoteTerminalPath, terminalUrl, TERMINAL_TOOLS } from '../../lib/terminal';
+import { canApplyTerminalFile, quoteTerminalPath, TERMINAL_TOOLS } from '../../lib/terminal';
 
 type Exported = { noteId: string; base: string; fileId: string; path: string };
 
 export function TerminalPanel() {
   useLocale();
   const { note, content, loaded } = useActiveNote();
-  const [url, setUrl] = useState(() => `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/writing-terminal/terminal`);
-  const [token, setToken] = useState('');
-  const [status, setStatus] = useState<'offline' | 'connecting' | 'ready'>('offline');
+  const [status, setStatus] = useState<'offline' | 'connecting' | 'ready'>('connecting');
   const [error, setError] = useState('');
-  const [command, setCommand] = useState<string>('claude');
+  const [command, setCommand] = useState<string>('codex');
   const [exported, setExported] = useState<Exported | null>(null);
   const [incoming, setIncoming] = useState<{ fileId: string; content: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -27,6 +25,8 @@ export function TerminalPanel() {
   const terminal = useRef<Terminal | null>(null);
   const socket = useRef<WebSocket | null>(null);
   const fit = useRef<FitAddon | null>(null);
+  const connectionRun = useRef(0);
+  const connectionAbort = useRef<AbortController | null>(null);
   const request = useRef<{ id: string; noteId: string; base: string; type: 'export' | 'read' } | null>(null);
   const snapshot = useRef(exported);
   snapshot.current = exported;
@@ -65,20 +65,45 @@ export function TerminalPanel() {
     socket.current.send(JSON.stringify(message));
     return true;
   };
-  const connect = () => {
-    let address: string;
-    try { address = terminalUrl(url); } catch { setError(t('terminal.invalid_url')); return; }
+  const connect = useCallback(async () => {
+    const attempt = ++connectionRun.current;
+    connectionAbort.current?.abort();
+    socket.current?.close(1000);
+    socket.current = null;
+    const controller = new AbortController();
+    connectionAbort.current = controller;
+    setStatus('connecting');
     setError('');
     setExported(null);
     setIncoming(null);
+    setBusy(false);
+    request.current = null;
     terminal.current?.reset();
+    const authorizationTimeout = window.setTimeout(() => controller.abort(), 8000);
+    try {
+      const response = await fetch('/api/terminal/authorize', { credentials: 'same-origin', cache: 'no-store', signal: controller.signal });
+      if (attempt !== connectionRun.current) return;
+      if (!response.ok || (await response.json()).authorized !== true) {
+        setStatus('offline');
+        setError(t(response.status === 401 ? 'terminal.sign_in' : response.status === 403 ? 'terminal.owner_only' : 'terminal.unavailable'));
+        return;
+      }
+    } catch {
+      if (attempt === connectionRun.current) { setStatus('offline'); setError(t('terminal.unavailable')); }
+      return;
+    } finally { window.clearTimeout(authorizationTimeout); }
+    if (attempt !== connectionRun.current) return;
+    const address = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/writing-terminal/terminal`;
     let ws: WebSocket;
-    try { ws = new WebSocket(address); } catch { setError(t('terminal.connect_error')); return; }
+    try { ws = new WebSocket(address); } catch { setStatus('offline'); setError(t('terminal.unavailable')); return; }
     socket.current = ws;
-    setStatus('connecting');
-    const timer = window.setTimeout(() => { ws.close(); setError(t('terminal.connect_error')); }, 8000);
-    ws.onopen = () => { ws.send(JSON.stringify({ type: 'auth', token })); setToken(''); };
+    const timer = window.setTimeout(() => {
+      if (attempt !== connectionRun.current) return;
+      ws.close();
+      setError(t('terminal.connect_error'));
+    }, 8000);
     ws.onmessage = (event) => {
+      if (attempt !== connectionRun.current) return;
       let msg;
       try { msg = JSON.parse(event.data); } catch { return; }
       if (msg.type === 'ready') {
@@ -101,7 +126,7 @@ export function TerminalPanel() {
         else if (msg.type === 'file' && msg.fileId === snapshot.current?.fileId) setIncoming({ fileId: msg.fileId, content: msg.content });
       }
     };
-    ws.onerror = () => setError(t('terminal.connect_error'));
+    ws.onerror = () => { if (attempt === connectionRun.current) setError(t('terminal.connect_error')); };
     ws.onclose = (event) => {
       window.clearTimeout(timer);
       if (socket.current !== ws) return;
@@ -113,6 +138,27 @@ export function TerminalPanel() {
       setIncoming(null);
       if (event.code !== 1000) setError(t('terminal.connect_error'));
     };
+  }, []);
+  useEffect(() => {
+    void connect();
+    return () => {
+      connectionRun.current++;
+      connectionAbort.current?.abort();
+      socket.current?.close(1000);
+      socket.current = null;
+    };
+  }, [connect]);
+  const disconnect = () => {
+    connectionRun.current++;
+    connectionAbort.current?.abort();
+    socket.current?.close(1000);
+    socket.current = null;
+    setStatus('offline');
+    setBusy(false);
+    setExported(null);
+    setIncoming(null);
+    request.current = null;
+    setError('');
   };
   const exportCurrent = () => {
     if (!note || !loaded) return;
@@ -141,18 +187,15 @@ export function TerminalPanel() {
       <strong className="text-xs">{t('terminal.title')}</strong>
       <span role="status" className="text-xs text-[var(--text-tertiary)]">{t(`terminal.${status}`)}</span>
       <span className="flex-1"/>
-      {status !== 'offline' && <Button size="sm" onClick={() => socket.current?.close(1000)}>{t('terminal.disconnect')}</Button>}
+      {status !== 'offline' && <Button size="sm" onClick={disconnect}>{t('terminal.disconnect')}</Button>}
       <IconButton label={t('common.close')} size="sm" onClick={() => useTerminal.getState().setOpen(false)}><X size={14}/></IconButton>
     </div>
-    {status === 'offline' && <div className="flex flex-wrap gap-2 px-3 pb-2">
-      <label className="flex min-w-48 flex-1 items-center gap-2 text-xs">{t('terminal.address')}<input className={`${inputClass} flex-1`} value={url} onChange={(event) => setUrl(event.target.value)}/></label>
-      <label className="flex items-center gap-2 text-xs">{t('terminal.token')}<input className={inputClass} type="password" autoComplete="off" value={token} onChange={(event) => setToken(event.target.value)}/></label>
-      <Button size="sm" disabled={!token.trim()} onClick={connect}>{t('terminal.connect')}</Button>
-      <p className="w-full text-xs text-[var(--text-tertiary)]">{t('terminal.setup_hint')}</p>
+    {status === 'offline' && <div className="flex items-center gap-2 px-3 pb-2">
+      <Button size="sm" onClick={() => void connect()}>{t('terminal.wake')}</Button>
     </div>}
     {status === 'ready' && <div className="flex flex-wrap gap-2 px-3 pb-2">
       <Button size="sm" disabled={!note || !loaded || busy} onClick={exportCurrent}>{t('terminal.export')}</Button>
-      <select aria-label={t('terminal.tool')} className={inputClass} onChange={(event) => setCommand(event.target.value)} defaultValue="claude">
+      <select aria-label={t('terminal.tool')} className={inputClass} onChange={(event) => setCommand(event.target.value)} defaultValue="codex">
         {TERMINAL_TOOLS.map((tool) => <option key={tool.name} value={tool.command}>{tool.name}</option>)}
       </select>
       <input aria-label={t('terminal.command')} className={`${inputClass} w-28`} value={command} onChange={(event) => setCommand(event.target.value)}/>

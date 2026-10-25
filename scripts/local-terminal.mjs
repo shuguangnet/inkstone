@@ -11,18 +11,35 @@ import * as pty from 'node-pty';
 const MAX_FILE = 2 * 1024 * 1024;
 const validId = (id) => typeof id === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(id);
 
-export async function startTerminalBridge({ origins, port = 31789, workspace = join(homedir(), '.inkstone', 'writing'), token = randomBytes(32).toString('hex'), shell = process.env.SHELL || (process.platform === 'win32' ? 'powershell.exe' : '/bin/bash') }) {
+export async function startTerminalBridge({ origins, port = 31789, workspace = join(homedir(), '.inkstone', 'writing'), token = randomBytes(32).toString('hex'), authorizeUrl, shell = process.env.SHELL || (process.platform === 'win32' ? 'powershell.exe' : '/bin/bash') }) {
   if (!origins?.length || origins.some((origin) => new URL(origin).origin !== origin)) throw new Error('Specify explicit --origin values (scheme and host only)');
+  if (authorizeUrl) {
+    const url = new URL(authorizeUrl);
+    if (url.protocol !== 'http:' || !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) || url.pathname !== '/api/terminal/authorize' || url.username || url.password || url.search || url.hash) throw new Error('Authorization URL must point to the local Inkstone /api/terminal/authorize endpoint');
+  }
   await mkdir(workspace, { recursive: true, mode: 0o700 });
   const root = await realpath(workspace);
   const server = createServer((_req, res) => { res.writeHead(404); res.end(); });
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_FILE + 65536, perMessageDeflate: false });
-  server.on('upgrade', (req, socket, head) => {
-    if (!origins.includes(req.headers.origin) || req.url !== '/terminal' || wss.clients.size >= 4) {
-      socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+  let pendingUpgrades = 0;
+  server.on('upgrade', async (req, socket, head) => {
+    socket.on('error', () => {});
+    const reject = (status) => { socket.end(`HTTP/1.1 ${status}\r\nConnection: close\r\n\r\n`); };
+    if (!origins.includes(req.headers.origin) || req.url !== '/terminal' || wss.clients.size + pendingUpgrades >= 4) {
+      reject('403 Forbidden');
       return;
     }
-    wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws));
+    pendingUpgrades++;
+    try {
+      if (authorizeUrl) {
+        if (!req.headers.cookie) { reject('401 Unauthorized'); return; }
+        const response = await fetch(authorizeUrl, { headers: { Cookie: req.headers.cookie }, redirect: 'manual', signal: AbortSignal.timeout(4000) });
+        const allowed = response.ok && (await response.json()).authorized === true;
+        if (!allowed) { reject('403 Forbidden'); return; }
+      }
+      if (!socket.destroyed) wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws));
+    } catch { reject('503 Service Unavailable'); }
+    finally { pendingUpgrades--; }
   });
   wss.on('connection', (ws) => {
     let authenticated = false;
@@ -45,6 +62,21 @@ export async function startTerminalBridge({ origins, port = 31789, workspace = j
     };
     ws.on('close', close);
     ws.on('error', close);
+    const startShell = () => {
+      authenticated = true;
+      clearTimeout(timeout);
+      terminal = pty.spawn(shell, [], { name: 'xterm-256color', cols: 100, rows: 24, cwd: root, env: { ...process.env, TERM: 'xterm-256color' } });
+      terminal.onData((data) => {
+        if (ws.bufferedAmount > 4 * MAX_FILE) { ws.close(1009, 'Output overflow'); return; }
+        send({ type: 'output', data });
+      });
+      terminal.onExit(({ exitCode }) => { send({ type: 'exit', exitCode }); ws.close(1000); });
+      send({ type: 'ready' });
+    };
+    if (authorizeUrl) {
+      try { startShell(); }
+      catch { send({ type: 'error', message: 'Could not start server shell' }); ws.close(1011); }
+    }
     let queue = Promise.resolve();
     ws.on('message', (raw) => {
       queue = queue.then(async () => {
@@ -58,13 +90,7 @@ export async function startTerminalBridge({ origins, port = 31789, workspace = j
           }
           authenticated = true;
           clearTimeout(timeout);
-          terminal = pty.spawn(shell, [], { name: 'xterm-256color', cols: 100, rows: 24, cwd: root, env: { ...process.env, TERM: 'xterm-256color' } });
-          terminal.onData((data) => {
-            if (ws.bufferedAmount > 4 * MAX_FILE) { ws.close(1009, 'Output overflow'); return; }
-            send({ type: 'output', data });
-          });
-          terminal.onExit(({ exitCode }) => { send({ type: 'exit', exitCode }); ws.close(1000); });
-          send({ type: 'ready' });
+          startShell();
           return;
         }
         if (msg.type === 'input' && typeof msg.data === 'string' && msg.data.length <= 65536) terminal?.write(msg.data);
@@ -109,9 +135,10 @@ export async function startTerminalBridge({ origins, port = 31789, workspace = j
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const args = process.argv.slice(2);
   const values = (key) => args.flatMap((arg, index) => arg === key ? [args[index + 1]] : []);
+  const authorizeUrl = values('--authorize-url')[0] || 'http://127.0.0.1:7712/api/terminal/authorize';
   try {
-    const bridge = await startTerminalBridge({ origins: values('--origin'), port: Number(values('--port')[0] || 31789), workspace: values('--workspace')[0] });
-    console.log(`Inkstone terminal: ws://127.0.0.1:${bridge.port}/terminal\nPairing token: ${bridge.token}\nAllowed sites: ${values('--origin').join(', ')}`);
+    const bridge = await startTerminalBridge({ origins: values('--origin'), port: Number(values('--port')[0] || 31789), workspace: values('--workspace')[0], authorizeUrl });
+    console.log(`Inkstone terminal: ws://127.0.0.1:${bridge.port}/terminal\nAuthentication: Inkstone owner session\nAllowed sites: ${values('--origin').join(', ')}`);
     for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { void bridge.close().then(() => process.exit()); });
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

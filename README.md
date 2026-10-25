@@ -161,6 +161,6 @@ Inkstone is distributed under the [GNU Lesser General Public License v3.0 only](
 
 ## Immersive writing and server AI terminal
 
-Use the editor button or `Ctrl/Cmd+Shift+E` to enter immersive writing, and `Esc` to exit. The editor and AI panel can open an interactive server terminal for Claude Code, Codex, PyAgent, DSH, or custom commands. Export the current note, insert its file path, preview file changes, and explicitly apply them back to the editor with conflict protection.
+Use the editor button or `Ctrl/Cmd+Shift+E` to enter immersive writing, and `Esc` to exit. Open the server terminal from the editor or AI panel with one click using the signed-in owner session, with no address or pairing token to enter. Run Claude Code, Codex, PyAgent, DSH, or custom commands. Export the current note, insert its file path, preview file changes, and explicitly apply them back to the editor with conflict protection.
 
 The terminal requires a separately deployed Node bridge and WSS reverse proxy. See the [deployment and usage guide (Chinese)](WRITING_WORKSPACE_ZH.md).

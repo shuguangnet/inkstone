@@ -17,6 +17,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run test:unit
+      - run: npm run test:terminal
       - run: npm run i18n:check
       - run: npm run comments:check
       - run: npm run build

@@ -5,13 +5,6 @@ export const TERMINAL_TOOLS = [
   { name: 'DSH', command: 'dsh' },
 ] as const;
 
-export function terminalUrl(value: string): string {
-  const url = new URL(value);
-  if (!['ws:', 'wss:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) throw new Error('terminal_url');
-  if (location.protocol === 'https:' && url.protocol !== 'wss:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) throw new Error('terminal_url');
-  return url.href;
-}
-
 export function quoteTerminalPath(path: string): string {
   return `'${path.replace(/'/g, `'\\''`)}'`;
 }

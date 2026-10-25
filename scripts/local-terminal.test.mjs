@@ -80,3 +80,49 @@ test('terminal bridge: origin, token, PTY, note snapshots and file boundary', as
     await new Promise((resolve) => next.ws.once('close', resolve));
   } finally { await bridge.close(); await rm(workspace, { recursive: true, force: true }); }
 });
+
+test('owner session mode starts directly and fails closed for missing, rejected or expired sessions', async () => {
+  const { createServer } = await import('node:http');
+  let allow = true;
+  let checks = 0;
+  const authorizer = createServer((req, res) => {
+    checks++;
+    assert.equal(req.url, '/api/terminal/authorize');
+    const authorized = allow && req.headers.cookie === 'session=owner';
+    res.writeHead(authorized ? 200 : 403, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ authorized }));
+  });
+  await new Promise((resolve) => authorizer.listen(0, '127.0.0.1', resolve));
+  const workspace = await mkdtemp(join(tmpdir(), 'inkstone-session-terminal-'));
+  const bridge = await startTerminalBridge({ origins: [origin], port: 0, workspace, authorizeUrl: `http://127.0.0.1:${authorizer.address().port}/api/terminal/authorize` });
+  const rejected = async (cookie, site = origin) => {
+    await assert.rejects(new Promise((resolve, reject) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}/terminal`, { origin: site, headers: cookie ? { Cookie: cookie } : {} });
+      ws.once('open', () => { ws.terminate(); resolve(); });
+      ws.once('error', reject);
+    }), /401|403|503/);
+  };
+  try {
+    await rejected();
+    assert.equal(checks, 0);
+    await rejected('session=owner', 'https://evil.example');
+    assert.equal(checks, 0);
+    await rejected('session=member');
+    const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}/terminal`, { origin, headers: { Cookie: 'session=owner' } });
+    const receive = inbox(ws);
+    await receive('ready');
+    ws.send(JSON.stringify({ type: 'input', data: "printf '\\nSESSION_PTY_OK\\n'\r" }));
+    let output = '';
+    while (!output.includes('\r\nSESSION_PTY_OK\r\n')) output += (await receive('output')).data;
+    ws.close(1000);
+    await new Promise((resolve) => ws.once('close', resolve));
+    allow = false;
+    await rejected('session=owner');
+    await new Promise((resolve) => authorizer.close(resolve));
+    await rejected('session=owner');
+  } finally {
+    await bridge.close();
+    if (authorizer.listening) await new Promise((resolve) => authorizer.close(resolve));
+    await rm(workspace, { recursive: true, force: true });
+  }
+});

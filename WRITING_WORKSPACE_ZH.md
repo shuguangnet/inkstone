@@ -3,7 +3,7 @@
 ## 实施计划及首版范围
 
 1. 沉浸式写作：隐藏导航、笔记列表、格式工具栏和第二窗格，正文居中；保留自动保存，提供段落聚焦与打字机开关。Ctrl/Cmd+Shift+E 进入，Esc 退出，退出后恢复原有布局。
-2. 服务器终端：真实 PTY + xterm.js；独立 Node 连接服务与 Worker 分开部署，由 HTTPS/WSS 代理接入；校验站点 Origin 和随机配对令牌。
+2. 服务器终端：真实 PTY + xterm.js；独立 Node 连接服务与 Worker 分开部署，由 HTTPS/WSS 代理接入；校验站点 Origin，并通过 Inkstone 现有站长登录会话鉴权。
 3. 写作闭环：编辑器、命令面板和 AI 面板提供终端入口；一键导出当前最新正文到服务器 Markdown，启动 Claude Code / Codex / PyAgent / DSH 或自定义命令，引入文件路径；读取修改、预览差异、检测冲突、确认写回。
 4. 验证：真实交互终端、连接鉴权、文件边界、写回保护、类型检查、中英文检查和生产构建。
 
@@ -16,7 +16,7 @@ npm ci
 npm run terminal:local -- --origin https://你的Inkstone域名
 ```
 
-服务只监听 `127.0.0.1:31789`，打印每次启动随机生成的配对令牌。终端运行在启动服务的用户环境中，不自动安装 CLI。
+服务只监听 `127.0.0.1:31789`。默认向本机 `http://127.0.0.1:7712/api/terminal/authorize` 验证站长登录状态；应用端口不同时，可用 `--authorize-url` 指定本机鉴权地址。终端运行在启动服务的用户环境中，不自动安装 CLI。
 
 在服务器外层的 Caddy HTTPS 站点内增加以下规则，并保留已有 Inkstone 反向代理：
 
@@ -33,7 +33,7 @@ notes.example.com {
 
 `handle_path` 会将 `/writing-terminal/terminal` 转成连接服务使用的 `/terminal`，Caddy 自动转发 WebSocket 升级请求。若 Caddy 在容器中，`127.0.0.1` 指容器自身，需要通过受限的宿主机网络接入；此规则应添加到能访问宿主机回环地址的外层代理。连接服务无需修改现有应用容器和数据卷。
 
-浏览器打开笔记，点“服务器终端”，默认地址为同站点的 `wss://你的Inkstone域名/writing-terminal/terminal`，填入令牌连接。令牌只保留在页面内存中，连接时清空输入框，不进入 URL 或浏览器持久存储。只有获准操作服务器的人员应持有此令牌；连接服务使用独立令牌鉴权，并不继承 Inkstone 的账号权限。
+浏览器登录站长账号，打开笔记后点击“服务器终端”即自动连接，无需填写地址、令牌或运行命令。断开后点击“唤醒终端”可重连。连接地址自动使用当前站点；连接服务在 WebSocket 握手时向 Inkstone 验证 HttpOnly 会话 Cookie，未登录、登录失效和普通成员均无法连接。鉴权服务不可用时拒绝连接，不回退到免鉴权模式。
 
 可以重复传入 `--origin` 允许多个明确站点；`--port` 修改端口，`--workspace` 指定工作目录（默认 `~/.inkstone/writing`）。Origin 只包含协议、域名及可选端口，不包含路径或尾部 `/`。
 
@@ -52,7 +52,7 @@ sudo systemctl enable --now inkstone-terminal
 sudo journalctl -u inkstone-terminal -n 20 --no-pager
 ```
 
-从日志读取配对令牌。重启服务会更换令牌并结束已有会话。模板使用专用用户和私有 HOME，CLI 应安装到 `/var/lib/inkstone-terminal/.local/bin` 或模板 PATH 下并以该用户登录；现有 root 用户的 CLI 配置不会被继承。模板限制文件写入到 `/var/lib/inkstone-terminal`，如工具需要其他工作目录，应明确调整 `ReadWritePaths`。不要把密码、API Key 或配对令牌提交到仓库。
+服务开机自动启动，用户通过网站点击即可唤醒终端。重启服务会结束已有会话，重新点击即可连接。模板使用专用用户和私有 HOME，CLI 应安装到 `/var/lib/inkstone-terminal/.local/bin` 或模板 PATH 下并以该用户登录；现有 root 用户的 CLI 配置不会被继承。模板限制文件写入到 `/var/lib/inkstone-terminal`，如工具需要其他工作目录，应明确调整 `ReadWritePaths`。不要把密码或 API Key 提交到仓库。
 
 ## 写作流程
 
