@@ -123,3 +123,15 @@ docker compose down
 - Keep `.env` out of Git and restrict it to the deployment owner.
 - Back up the persistent volume and test restore procedures.
 - This is a single-node runtime. It does not provide Cloudflare's distributed availability, managed storage durability, or Workers AI binding.
+
+## Backup HTTPS certificate trust
+
+The runtime image includes `ca-certificates` because workerd validates WebDAV and S3 TLS connections against the system trust store. Images without this package fail all outbound HTTPS backup connections. Rebuild and redeploy the image; do not disable certificate verification.
+
+Check both services from the actual Worker runtime without credentials or remote writes:
+
+```bash
+docker compose exec app node scripts/check-vps-outbound.mjs
+```
+
+HTTP 401 from WebDAV and HTTP 307 from S3 demonstrate successful HTTPS connections. Use the application's connection test to verify your account's read and write access.

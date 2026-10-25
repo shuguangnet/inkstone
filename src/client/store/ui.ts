@@ -35,6 +35,8 @@ interface UiState {
   navCollapsed: boolean
   listCollapsed: boolean
 
+  immersive: boolean
+  toggleImmersive: () => void
   navDrawerOpen: boolean
   splitRatio: number | null
   workspaceSplitRatio: number | null
@@ -300,6 +302,8 @@ let toastSeq = 0
 
 export const useUi = create<UiState>((set, get) => ({
   ...DEFAULTS,
+  immersive: false,
+  toggleImmersive: () => set((s) => ({ immersive: !s.immersive })),
   selectedIds: [],
   navDrawerOpen: false,
   panel: null,

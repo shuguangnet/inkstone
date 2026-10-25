@@ -123,3 +123,15 @@ docker compose down
 - 不要把 `.env` 提交到 Git，并限制只有部署管理员可以读取。
 - 定期备份持久化卷并实际测试恢复流程。
 - 这是单机运行模式，不具备 Cloudflare 的分布式可用性、托管存储耐久性和 Workers AI 能力。
+
+## 备份连接的 HTTPS 证书
+
+运行镜像必须包含 `ca-certificates`，workerd 使用系统根证书验证 WebDAV 和 S3 的 TLS 连接。缺少该包会导致所有 HTTPS 备份地址报“域名解析失败、端口不通或证书无效”。更新镜像并重建应用即可恢复，不需要关闭证书验证或修改备份凭据。
+
+可在运行环境中检查真实 Worker 出站连接（不使用账号、不写入远程数据）：
+
+```bash
+docker compose exec app node scripts/check-vps-outbound.mjs
+```
+
+WebDAV 返回 HTTP 401、S3 返回 HTTP 307 均表示 HTTPS 已连通；备份账号的读写验证仍通过应用的“测试连接”完成。

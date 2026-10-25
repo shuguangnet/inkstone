@@ -2,6 +2,8 @@ FROM node:24.15.0-bookworm-slim AS build
 
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
+
 COPY package.json package-lock.json ./
 RUN npm ci
 
@@ -13,12 +15,14 @@ FROM node:24.15.0-bookworm-slim AS runtime
 ENV NODE_ENV=production
 ENV INKSTONE_DATA_DIR=/data
 
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY --from=build --chown=node:node /app/package.json /app/package-lock.json ./
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
-COPY --from=build --chown=node:node /app/scripts/start-vps.mjs /app/scripts/vps-scheduler.mjs ./scripts/
+COPY --from=build --chown=node:node /app/scripts/start-vps.mjs /app/scripts/vps-scheduler.mjs /app/scripts/check-vps-outbound.mjs ./scripts/
 
 RUN mkdir -p /data && chown node:node /data
 

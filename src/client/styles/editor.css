@@ -426,3 +426,12 @@
     padding-bottom: 30vh;
   }
 }
+
+.immersive-workspace .ink-editor .cm-content {
+  width: min(100%, 800px);
+  margin-inline: auto;
+  padding-block: 40px 45vh;
+}
+.immersive-workspace .ink-editor .cm-line {
+  padding-inline: 28px;
+}

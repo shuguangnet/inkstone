@@ -158,3 +158,9 @@ Read [`SECURITY.md`](./SECURITY.md) before reporting a vulnerability. Developmen
 ## License
 
 Inkstone is distributed under the [GNU Lesser General Public License v3.0 only](./LICENSE), using the SPDX identifier `LGPL-3.0-only`.
+
+## Immersive writing and server AI terminal
+
+Use the editor button or `Ctrl/Cmd+Shift+E` to enter immersive writing, and `Esc` to exit. The editor and AI panel can open an interactive server terminal for Claude Code, Codex, PyAgent, DSH, or custom commands. Export the current note, insert its file path, preview file changes, and explicitly apply them back to the editor with conflict protection.
+
+The terminal requires a separately deployed Node bridge and WSS reverse proxy. See the [deployment and usage guide (Chinese)](WRITING_WORKSPACE_ZH.md).

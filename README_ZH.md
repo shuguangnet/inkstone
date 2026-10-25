@@ -159,3 +159,9 @@ tests/        跨模块回归测试
 ## 许可证
 
 Inkstone 使用 [GNU Lesser General Public License v3.0 only](./LICENSE)，SPDX 标识为 `LGPL-3.0-only`。
+
+## 沉浸式写作与服务器 AI 终端
+
+使用编辑器的沉浸式写作按钮或 `Ctrl/Cmd+Shift+E` 隐藏导航并居中写作，`Esc` 退出。编辑器和 AI 辅助面板支持打开服务器交互终端，接入 Claude Code、Codex、PyAgent、DSH 及自定义命令，并支持当前笔记导出、文件路径引入、修改预览和确认写回。
+
+终端需要独立部署 Node 连接服务与 WSS 代理，详见 [配置和使用说明](WRITING_WORKSPACE_ZH.md)。

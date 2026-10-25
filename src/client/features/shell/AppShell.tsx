@@ -11,6 +11,7 @@ import { EditorSkeleton } from '../../components/feedback';
 import { PANEL_WIDTHS, useUi } from '../../store/ui';
 import { createContextualNote, useNotes } from '../../store/notes';
 import { useSession } from '../../store/session';
+import { useTerminal } from '../../store/terminal';
 import { useUpdate } from '../../store/update';
 import { Sidebar } from '../sidebar/Sidebar';
 import { NoteList } from '../list/NoteList';
@@ -28,6 +29,7 @@ import { Resizer, SplitResizer } from './Resizer';
 import { t } from "../../lib/i18n";
 import { SettingsPanel } from '../settings/SettingsPanel';
 import { scheduleSettingsWarmup } from '../settings/sections';
+const TerminalPanel = lazy(() => import('../terminal/TerminalPanel').then((m) => ({ default: m.TerminalPanel })));
 const Workspace = lazy(() => import('../workspace/Workspace').then((m) => ({ default: m.Workspace })));
 const CommandPalette = lazy(() => import('../command/CommandPalette').then((m) => ({ default: m.CommandPalette })));
 const ShortcutsPanel = lazy(() => import('../command/ShortcutsPanel').then((m) => ({ default: m.ShortcutsPanel })));
@@ -40,6 +42,17 @@ export function AppShell() {
     const breakpoint = useBreakpoint();
     const role = useSession((s) => s.user?.role);
     const userId = useSession((s) => s.user?.id);
+    const immersive = useUi((s) => s.immersive);
+    useEffect(() => {
+        if (!immersive) return;
+        const onEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && !event.defaultPrevented && !useUi.getState().panel && !(event.target as HTMLElement)?.closest('.xterm')) {
+                useUi.setState({ immersive: false });
+            }
+        };
+        window.addEventListener('keydown', onEscape);
+        return () => window.removeEventListener('keydown', onEscape);
+    }, [immersive]);
     useEffect(() => scheduleSettingsWarmup(), [userId]);
     const checkForUpdates = useUpdate((s) => s.check);
     useSyncEngine();
@@ -84,15 +97,15 @@ export function AppShell() {
     const isMobile = breakpoint === 'mobile';
     const isTablet = breakpoint === 'tablet';
 
-    const showNav = !isMobile && !isTablet;
-    const navAsDrawer = isTablet && navDrawerOpen;
-    const showList = !listCollapsed && !isMobile;
-    const showWorkspaceSplit = breakpoint === 'desktop' && Boolean(workspaceSecondaryNoteId);
+    const showNav = !immersive && !isMobile && !isTablet;
+    const navAsDrawer = !immersive && isTablet && navDrawerOpen;
+    const showList = !immersive && !listCollapsed && !isMobile;
+    const showWorkspaceSplit = !immersive && breakpoint === 'desktop' && Boolean(workspaceSecondaryNoteId);
     const effectiveWorkspaceSplitRatio = workspaceSplitRatio ?? 0.5;
     if (isMobile)
         return <MobileShell />;
     return (<div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[var(--bg-base)]">
-      {isTablet && (<div className="flex h-11 shrink-0 items-center gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-sunken)] px-3">
+      {isTablet && !immersive && (<div className="flex h-11 shrink-0 items-center gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-sunken)] px-3">
         <IconButton label={t('common.navigation')} onClick={() => toggleNavDrawer(true)}><PanelLeft size={16}/></IconButton>
         <div className="w-full max-w-sm"><SearchButton /></div>
       </div>)}
@@ -132,6 +145,7 @@ export function AppShell() {
         <Sidebar onCollapse={() => toggleNavDrawer(false)}/>
       </Drawer>
 
+      <TerminalHost />
       <OverlayHost />
     </div>);
 }
@@ -174,8 +188,13 @@ function MobileShell() {
         <SearchButton variant="mobile" />
       </nav>
 
+      <TerminalHost />
       <OverlayHost />
     </div>);
+}
+function TerminalHost() {
+    const open = useTerminal((s) => s.open);
+    return open ? <Suspense fallback={null}><InlineErrorBoundary><TerminalPanel /></InlineErrorBoundary></Suspense> : null;
 }
 function WorkspaceFallback() {
     return (
@@ -219,6 +238,11 @@ function useGlobalHotkeys(): void {
         const ui = () => useUi.getState();
         const notes = () => useNotes.getState();
         return registerAll([
+            {
+                id: 'immersive', combo: 'mod+shift+e',
+                description: () => t('writing.immersive'), group: () => t('common.interface'),
+                allowInInput: true, handler: () => ui().toggleImmersive(),
+            },
             {
                 id: 'command',
                 combo: 'mod+k',

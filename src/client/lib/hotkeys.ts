@@ -48,7 +48,7 @@ function ensureBound(): void {
 }
 
 function onKeyDown(event: KeyboardEvent): void {
-  if (event.isComposing || event.repeat) return
+  if (event.isComposing || event.repeat || (event.target as HTMLElement | null)?.closest?.('.xterm')) return
   const inInput = isEditableTarget(event.target)
 
   for (const hotkey of registry.values()) {

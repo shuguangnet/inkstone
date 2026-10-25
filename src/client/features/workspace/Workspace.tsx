@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { EditorView } from '@codemirror/view';
-import { ArrowLeft, Columns2, Download, Eye, FileCode, FileDown, FileText, FolderClosed, Hash, History, Link as LinkIcon, ListTree, MoreHorizontal, PanelRightClose, Pencil, Plus, Share2, Sparkles, Star, X, } from 'lucide-react';
+import { ArrowLeft, Maximize2, Minimize2, TerminalSquare, Columns2, Download, Eye, FileCode, FileDown, FileText, FolderClosed, Hash, History, Link as LinkIcon, ListTree, MoreHorizontal, PanelRightClose, Pencil, Plus, Share2, Sparkles, Star, X, } from 'lucide-react';
 import { cn } from '../../lib/cn';
 import { api } from '../../lib/api';
 import { readingMinutes } from '@shared/markdown-utils';
@@ -24,6 +24,7 @@ import { EditorToolbar } from './EditorToolbar';
 import { BacklinksPanel } from './BacklinksPanel';
 import { AssistantPanel } from '../ai/AssistantPanel';
 import { SelectionToolbar } from '../ai/SelectionToolbar';
+import { useTerminal } from '../../store/terminal';
 import { useAi } from '../../store/ai';
 import { SaveIndicator } from '../shell/SaveIndicator';
 import type { Heading } from '../../lib/markdown/renderer';
@@ -58,6 +59,8 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
     const openPanel = useUi((s) => s.openPanel);
     const outlineOpen = useUi((s) => s.outlineOpen);
     const backlinksOpen = useUi((s) => s.backlinksOpen);
+    const immersive = useUi((s) => s.immersive);
+    const toggleImmersive = useUi((s) => s.toggleImmersive);
     const assistantOpen = useAi((s) => s.panelOpen);
     const setAssistantOpen = useAi((s) => s.setPanelOpen);
     const toggleOutline = useUi((s) => s.toggleOutline);
@@ -88,14 +91,14 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
     const [containerWidth, setContainerWidth] = useState(0);
     const isMobile = breakpoint === 'mobile';
     const paneActive = !grouped || pane === 'active' || activeWorkspacePane === pane;
-    const layout = isMobile
+    const layout = immersive ? 'edit' : isMobile
         ? mobileLayout
         : grouped && pane !== 'active'
             ? workspacePaneLayouts[pane]
             : settings.preview.layout;
     const showEditor = layout === 'edit' || layout === 'split';
     const showPreview = layout === 'preview' || layout === 'split';
-    const outlineVisible = !isMobile && outlineOpen && paneActive && headings.length > 0;
+    const outlineVisible = !immersive && !isMobile && outlineOpen && paneActive && headings.length > 0;
     const defaultOutlineWidth = outlineVisible ? OUTLINE_WIDTH : 0;
     const defaultContentWidth = Math.max(0, containerWidth - SPLIT_HANDLE_WIDTH - PREVIEW_BORDER_WIDTH - defaultOutlineWidth);
     const defaultEditorWidth = defaultContentWidth / 2;
@@ -348,7 +351,7 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
         if (grouped && pane !== 'active' && !paneActive)
             activateWorkspacePane(pane);
     };
-    return (<div role={grouped ? 'region' : undefined} aria-label={grouped ? (pane === 'secondary' ? t("workspace.right_note_pane") : t("workspace.left_note_pane")) : undefined} data-workspace-pane={grouped ? pane : undefined} onPointerDownCapture={activatePane} onFocusCapture={activatePane} className={cn('flex h-full min-h-0 flex-col bg-[var(--bg-editor)]', grouped && paneActive && 'shadow-[inset_0_2px_0_var(--accent)]')}>
+    return (<div role={grouped ? 'region' : undefined} aria-label={grouped ? (pane === 'secondary' ? t("workspace.right_note_pane") : t("workspace.left_note_pane")) : undefined} data-workspace-pane={grouped ? pane : undefined} onPointerDownCapture={activatePane} onFocusCapture={activatePane} className={cn('flex h-full min-h-0 flex-col bg-[var(--bg-editor)]', immersive && 'immersive-workspace', grouped && paneActive && 'shadow-[inset_0_2px_0_var(--accent)]')}>
       <header className="flex h-11 shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-3">
         {isMobile && onMobileBack && (<Tooltip label={t("workspace.back_to_notes")} side="right">
             <IconButton label={t("workspace.back_to_notes")} size="sm" onClick={onMobileBack}>
@@ -380,7 +383,17 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
         </div>
 
         <div className="flex shrink-0 items-center gap-0.5">
-          {grouped ? (<>
+          {!isMobile && <>
+            <Tooltip label={t(immersive ? 'writing.exit' : 'writing.immersive')} combo="mod+shift+e">
+              <IconButton size="sm" label={t(immersive ? 'writing.exit' : 'writing.immersive')} active={immersive} onClick={toggleImmersive}>
+                {immersive ? <Minimize2 size={14}/> : <Maximize2 size={14}/>}
+              </IconButton>
+            </Tooltip>
+            <Tooltip label={t('terminal.title')}>
+              <IconButton size="sm" label={t('terminal.title')} onClick={() => useTerminal.getState().setOpen(!useTerminal.getState().open)}><TerminalSquare size={14}/></IconButton>
+            </Tooltip>
+          </>}
+          {!immersive && (grouped ? (<>
             <div className="mr-1 hidden 2xl:block">
               <Segmented label={t("workspace.layout")} size="sm" value={layout} onChange={setEditorLayout} options={[
                 { value: 'edit', label: <Pencil size={12.5}/>, title: t("workspace.edit_only") },
@@ -452,17 +465,27 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
                 <MoreHorizontal size={16}/>
               </IconButton>
             </Tooltip>)}
-          </>)}
+          </>))}
+          {immersive && <Tooltip label={t('ai.panel.title')}>
+            <IconButton size="sm" label={t('ai.panel.title')} active={assistantOpen} onClick={() => setAssistantOpen(!assistantOpen)}><Sparkles size={14}/></IconButton>
+          </Tooltip>}
         </div>
       </header>
 
-      {settings.editor.showToolbar && showEditor && (<EditorToolbar runCommand={runEditorCommand} mobile={isMobile} onPickImage={() => fileInputRef.current?.click()}/>)}
+      {!immersive && settings.editor.showToolbar && showEditor && (<EditorToolbar runCommand={runEditorCommand} mobile={isMobile} onPickImage={() => fileInputRef.current?.click()}/>)}
 
+      {immersive && <div className="flex shrink-0 items-center justify-center gap-4 py-2 text-xs text-[var(--text-tertiary)]">
+        <label className="flex items-center gap-1.5"><input type="checkbox" checked={settings.editor.focusMode} onChange={(event) => void updateSettings({ editor: { focusMode: event.target.checked } })}/>{t('writing.focus')}</label>
+        <label className="flex items-center gap-1.5"><input type="checkbox" checked={settings.editor.typewriter} onChange={(event) => void updateSettings({ editor: { typewriter: event.target.checked } })}/>{t('writing.typewriter')}</label>
+        <SaveIndicator />
+      </div>}
       <SelectionToolbar view={view}/>
 
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div ref={containerRef} className="flex min-h-0 flex-1">
         {showEditor && (<div className="min-w-0" style={{ width: layout === 'split' ? editorWidth : '100%' }}>
-            <CodeEditor key={note.id} value={content} onChange={onChange} settings={settings.editor} sources={sources} handlers={handlers} onReady={setView}/>
+            <CodeEditor key={note.id} value={content} onChange={onChange} settings={immersive ? { ...settings.editor, lineNumbers: false } : settings.editor} sources={sources} handlers={handlers} onReady={setView}/>
           </div>)}
 
         {layout === 'split' && (<SplitResizer label={t("workspace.resize_editor_and_preview_panes")} containerRef={containerRef} ratio={effectiveSplitRatio} onChange={(splitRatio) => setLayout({ splitRatio })} onReset={() => setLayout({ splitRatio: null })}/>)}
@@ -473,9 +496,11 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
           </div>)}
       </div>
 
-      {backlinksOpen && paneActive && <BacklinksPanel noteId={note.id}/>}
+      {!immersive && backlinksOpen && paneActive && <BacklinksPanel noteId={note.id}/>}
 
+      </div>
       {assistantOpen && paneActive && <AssistantPanel onClose={() => setAssistantOpen(false)}/>}
+      </div>
 
       <Menu anchor={moreButtonRef} open={moreMenuOpen} onClose={() => setMoreMenuOpen(false)} items={grouped ? groupedItems : mobileItems} align="end" width={220}/>
       <Drawer open={cryptoOpen} onClose={() => setCryptoOpen(false)} title={cryptoMode === 'encrypt' ? t("workspace.encrypt_note") : t("workspace.decrypt_note")} width={340}>

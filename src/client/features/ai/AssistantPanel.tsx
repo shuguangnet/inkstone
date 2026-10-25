@@ -3,6 +3,7 @@ import { Bot, Sparkles, Square, X } from 'lucide-react';
 import { cn } from '../../lib/cn';
 import { IconButton, Button } from '../../components/primitives';
 import { diffLines } from '../../lib/ai-diff';
+import { useTerminal } from '../../store/terminal';
 import { useAi } from '../../store/ai';
 import { useActiveNote, useNotes } from '../../store/notes';
 import type { AiChatMessage } from '../../store/ai';
@@ -92,7 +93,7 @@ export function AssistantPanel({ onClose }: {
         editContent(note.id, lastResultRef.current);
     };
 
-    return (<aside className="flex w-full flex-col border-l border-[var(--border-subtle)] bg-[var(--bg-editor)] md:w-[340px]">
+    return (<aside className="flex h-[40vh] min-h-0 w-full shrink-0 flex-col overflow-hidden md:h-auto border-l border-[var(--border-subtle)] bg-[var(--bg-editor)] md:w-[340px]">
       <div className="flex shrink-0 items-center gap-1.5 border-b border-[var(--border-subtle)] px-3 py-2">
         <Sparkles size={12} className="text-[var(--accent)]"/>
         <span className="text-[10.5px] font-semibold tracking-[0.06em] text-[var(--text-quaternary)]">{t("ai.panel.title")}</span>
@@ -101,6 +102,9 @@ export function AssistantPanel({ onClose }: {
         <IconButton label={t("common.close")} size="sm" onClick={onClose}><X size={13}/></IconButton>
       </div>
 
+      <div className="border-b border-[var(--border-subtle)] px-3 py-2">
+        <Button size="sm" className="w-full" onClick={() => useTerminal.getState().setOpen(true)}>{t('terminal.title')}</Button>
+      </div>
       {!statusAvailable && (<div className="border-b border-[var(--border-subtle)] bg-[var(--bg-base)] px-3 py-2 text-xs text-[var(--text-tertiary)]">
         {t("ai.panel.not_configured")}
         {status?.reason === 'disabled' ? '' : ''}

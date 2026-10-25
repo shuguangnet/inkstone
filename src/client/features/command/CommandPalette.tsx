@@ -10,6 +10,7 @@ import { useDebounced, useNow } from '../../lib/hooks';
 import { shortTime } from '../../lib/time';
 import { IconButton, Kbd } from '../../components/primitives';
 import { Tooltip, useDialogFocus, useEscape, useLockScroll } from '../../components/overlay';
+import { useTerminal } from '../../store/terminal';
 import { useUi } from '../../store/ui';
 import { createContextualNote, useNotes } from '../../store/notes';
 import { folderPathLabel, openFolderView } from '../../lib/folders';
@@ -88,6 +89,8 @@ export function CommandPalette({ onClose }: {
         const activeNote = activeNoteId ? notes[activeNoteId] : null;
         const isDark = document.documentElement.dataset.theme === 'dark';
         return [
+            { id: 'cmd-immersive', kind: 'command', label: t('writing.immersive'), icon: <Pencil size={14}/>, combo: 'mod+shift+e', group: t('command.commands'), run: () => useUi.getState().toggleImmersive() },
+            { id: 'cmd-terminal', kind: 'command', label: t('terminal.title'), icon: <Columns2 size={14}/>, group: t('command.commands'), run: () => useTerminal.getState().setOpen(true) },
             {
                 id: 'cmd-new',
                 kind: 'command',
