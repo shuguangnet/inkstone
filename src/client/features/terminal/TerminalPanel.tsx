@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import { X } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
-import { Button, IconButton } from '../../components/primitives';
+import { Button } from '../../components/primitives';
 import { useActiveNote, useNotes } from '../../store/notes';
-import { useTerminal } from '../../store/terminal';
 import { t, useLocale } from '../../lib/i18n';
 import { diffLines } from '../../lib/ai-diff';
 import { canApplyTerminalFile, quoteTerminalPath, TERMINAL_TOOLS } from '../../lib/terminal';
+
+import { TerminalWindow } from './TerminalWindow';
 
 type Exported = { noteId: string; base: string; fileId: string; path: string };
 
@@ -182,14 +182,11 @@ export function TerminalPanel() {
     return diffLines(exported.base, incoming.content);
   }, [exported, incoming]);
   const inputClass = 'min-w-0 rounded border border-[var(--border-default)] bg-[var(--bg-base)] px-2 py-1 text-xs';
-  return <section aria-label={t('terminal.title')} className="flex h-[44vh] min-h-[260px] max-h-[65vh] shrink-0 flex-col border-t border-[var(--border-default)] bg-[var(--bg-editor)]">
-    <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+  return <TerminalWindow header={<>
       <strong className="text-xs">{t('terminal.title')}</strong>
       <span role="status" className="text-xs text-[var(--text-tertiary)]">{t(`terminal.${status}`)}</span>
-      <span className="flex-1"/>
       {status !== 'offline' && <Button size="sm" onClick={disconnect}>{t('terminal.disconnect')}</Button>}
-      <IconButton label={t('common.close')} size="sm" onClick={() => useTerminal.getState().setOpen(false)}><X size={14}/></IconButton>
-    </div>
+    </>}>
     {status === 'offline' && <div className="flex items-center gap-2 px-3 pb-2">
       <Button size="sm" onClick={() => void connect()}>{t('terminal.wake')}</Button>
     </div>}
@@ -223,5 +220,5 @@ export function TerminalPanel() {
         <pre className="min-h-0 flex-1 overflow-auto text-xs whitespace-pre-wrap break-words">{previewLines === null ? incoming.content.slice(0, 200000) : previewLines.map((line, index) => <div key={index} className={line.kind === 'added' ? 'bg-green-500/15' : line.kind === 'removed' ? 'bg-red-500/15 line-through' : ''}>{line.text || ' '}</div>)}</pre>
       </div>}
     </div>
-  </section>;
+  </TerminalWindow>;
 }

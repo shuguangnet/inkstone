@@ -524,3 +524,13 @@
 .ink-editor[data-focus-mode='true'] .cm-live-block {
   opacity: 0.32;
 }
+
+@media (max-width: 767px) {
+  .inkstone-terminal-window {
+    position: fixed !important;
+    inset: auto 8px 64px !important;
+    width: auto !important;
+    height: 55dvh !important;
+    z-index: 35;
+  }
+}

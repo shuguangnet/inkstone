@@ -466,6 +466,8 @@ export interface TestConnectionResult {
   message: string
   detail?: string
   latencyMs?: number
+  redirectUrl?: string
+  resolvedUrl?: string
 }
 
 

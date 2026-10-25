@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { mkdir, open, realpath } from 'node:fs/promises';
 import { constants } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { resolve, join, dirname, delimiter } from 'node:path';
 import { homedir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -65,7 +65,7 @@ export async function startTerminalBridge({ origins, port = 31789, workspace = j
     const startShell = () => {
       authenticated = true;
       clearTimeout(timeout);
-      terminal = pty.spawn(shell, [], { name: 'xterm-256color', cols: 100, rows: 24, cwd: root, env: { ...process.env, TERM: 'xterm-256color' } });
+      terminal = pty.spawn(shell, [], { name: 'xterm-256color', cols: 100, rows: 24, cwd: root, env: { ...process.env, PATH: [...new Set([dirname(process.execPath), join(homedir(), '.local', 'bin'), ...(process.env.PATH || '').split(delimiter)])].join(delimiter), TERM: 'xterm-256color' } });
       terminal.onData((data) => {
         if (ws.bufferedAmount > 4 * MAX_FILE) { ws.close(1009, 'Output overflow'); return; }
         send({ type: 'output', data });

@@ -1,3 +1,4 @@
+import { terminalGrid } from '../../lib/terminal-layout';
 import { lazy, Suspense, useEffect, useRef } from 'react';
 import { Eye, FileText, ListTree, PanelLeft, PencilLine } from 'lucide-react';
 import { cn } from '../../lib/cn';
@@ -95,6 +96,9 @@ export function AppShell() {
     const toggleNavDrawer = useUi((s) => s.toggleNavDrawer);
     const setLayout = useUi((s) => s.setLayout);
     const workspaceGroupsRef = useRef<HTMLElement>(null);
+    const terminalOpen = useTerminal((s) => s.open);
+    const terminalDock = useTerminal((s) => s.dock);
+    const terminalSize = useTerminal((s) => s.size);
     const isMobile = breakpoint === 'mobile';
     const isTablet = breakpoint === 'tablet';
 
@@ -110,43 +114,45 @@ export function AppShell() {
         <IconButton label={t('common.navigation')} onClick={() => toggleNavDrawer(true)}><PanelLeft size={16}/></IconButton>
         <div className="w-full max-w-sm"><SearchButton /></div>
       </div>)}
-      <div className="flex min-h-0 min-w-0 flex-1">
-        {showNav && (<>
-            <div style={{ width: navCollapsed ? 48 : navWidth }} className="shrink-0 overflow-hidden transition-[width] duration-[var(--dur-slow)] ease-[var(--ease-out)]">
-              <Sidebar collapsed={navCollapsed} onCollapse={toggleNav}/>
-            </div>
-            {!navCollapsed && (<Resizer label={t("shell.resize_navigation_panel")} value={navWidth} min={PANEL_WIDTHS.navigation.min} max={PANEL_WIDTHS.navigation.max} onChange={(navWidth) => setLayout({ navWidth })} onReset={() => setLayout({ navWidth: PANEL_WIDTHS.navigation.min })}/>)}
-          </>)}
-
-        {showList && (<>
-            <div style={{ width: listWidth }} className="anim-view-content shrink-0 overflow-hidden">
-              <ListPane />
-            </div>
-            <Resizer label={t("shell.resize_note_list")} value={listWidth} min={PANEL_WIDTHS.noteList.min} max={PANEL_WIDTHS.noteList.max} onChange={(listWidth) => setLayout({ listWidth })} onReset={() => setLayout({ listWidth: PANEL_WIDTHS.noteList.min })}/>
-          </>)}
-
-        <main ref={workspaceGroupsRef} className="flex min-w-0 flex-1">
-          <Suspense fallback={<WorkspaceFallback />}>
-            {showWorkspaceSplit ? (<>
-              <div className="min-w-0" style={{ width: `${effectiveWorkspaceSplitRatio * 100}%` }}>
-                <InlineErrorBoundary><Workspace pane="primary" grouped/></InlineErrorBoundary>
+      <div className="relative grid min-h-0 min-w-0 flex-1" style={terminalGrid(terminalDock, terminalSize, terminalOpen)}>
+        <div className="flex min-h-0 min-w-0" style={{ gridArea: 'workspace' }}>
+          {showNav && (<>
+              <div style={{ width: navCollapsed ? 48 : navWidth }} className="shrink-0 overflow-hidden transition-[width] duration-[var(--dur-slow)] ease-[var(--ease-out)]">
+                <Sidebar collapsed={navCollapsed} onCollapse={toggleNav}/>
               </div>
-              <SplitResizer label={t("shell.resize_note_panes")} containerRef={workspaceGroupsRef} ratio={effectiveWorkspaceSplitRatio} onChange={(workspaceSplitRatio) => setLayout({ workspaceSplitRatio })} onReset={() => setLayout({ workspaceSplitRatio: null })}/>
-              <div className="anim-view-content min-w-0 flex-1">
-                <InlineErrorBoundary><Workspace pane="secondary" grouped/></InlineErrorBoundary>
+              {!navCollapsed && (<Resizer label={t("shell.resize_navigation_panel")} value={navWidth} min={PANEL_WIDTHS.navigation.min} max={PANEL_WIDTHS.navigation.max} onChange={(navWidth) => setLayout({ navWidth })} onReset={() => setLayout({ navWidth: PANEL_WIDTHS.navigation.min })}/>)}
+            </>)}
+
+          {showList && (<>
+              <div style={{ width: listWidth }} className="anim-view-content shrink-0 overflow-hidden">
+                <ListPane />
               </div>
-            </>) : (<div className="min-w-0 flex-1">
-                <InlineErrorBoundary><Workspace /></InlineErrorBoundary>
-              </div>)}
-          </Suspense>
-        </main>
+              <Resizer label={t("shell.resize_note_list")} value={listWidth} min={PANEL_WIDTHS.noteList.min} max={PANEL_WIDTHS.noteList.max} onChange={(listWidth) => setLayout({ listWidth })} onReset={() => setLayout({ listWidth: PANEL_WIDTHS.noteList.min })}/>
+            </>)}
+
+          <main ref={workspaceGroupsRef} className="flex min-w-0 flex-1">
+            <Suspense fallback={<WorkspaceFallback />}>
+              {showWorkspaceSplit ? (<>
+                <div className="min-w-0" style={{ width: `${effectiveWorkspaceSplitRatio * 100}%` }}>
+                  <InlineErrorBoundary><Workspace pane="primary" grouped/></InlineErrorBoundary>
+                </div>
+                <SplitResizer label={t("shell.resize_note_panes")} containerRef={workspaceGroupsRef} ratio={effectiveWorkspaceSplitRatio} onChange={(workspaceSplitRatio) => setLayout({ workspaceSplitRatio })} onReset={() => setLayout({ workspaceSplitRatio: null })}/>
+                <div className="anim-view-content min-w-0 flex-1">
+                  <InlineErrorBoundary><Workspace pane="secondary" grouped/></InlineErrorBoundary>
+                </div>
+              </>) : (<div className="min-w-0 flex-1">
+                  <InlineErrorBoundary><Workspace /></InlineErrorBoundary>
+                </div>)}
+            </Suspense>
+          </main>
+        </div>
+
+        <TerminalHost />
       </div>
-
       <Drawer open={navAsDrawer} onClose={() => toggleNavDrawer(false)} side="left" width={272} title={t("common.navigation")}>
         <Sidebar onCollapse={() => toggleNavDrawer(false)}/>
       </Drawer>
 
-      <TerminalHost />
       <OverlayHost />
     </div>);
 }

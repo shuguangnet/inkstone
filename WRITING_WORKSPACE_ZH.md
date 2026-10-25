@@ -4,9 +4,9 @@
 
 ## 实施计划及首版范围
 
-1. 沉浸式写作：隐藏导航、笔记列表、格式工具栏和第二窗格，正文居中；保留自动保存，提供段落聚焦与打字机开关。Ctrl/Cmd+Shift+E 进入，Esc 退出，退出后恢复原有布局。
+1. 沉浸式写作：隐藏导航、笔记列表和第二窗格，正文居中；保留自动保存，提供格式工具栏、顶部写作快捷指引、段落聚焦与打字机开关。Ctrl/Cmd+Shift+E 进入，Esc 退出，退出后恢复原有布局。
 2. 服务器终端：真实 PTY + xterm.js；独立 Node 连接服务与 Worker 分开部署，由 HTTPS/WSS 代理接入；校验站点 Origin，并通过 Inkstone 现有站长登录会话鉴权。
-3. 写作闭环：编辑器、命令面板和 AI 面板提供终端入口；一键导出当前最新正文到服务器 Markdown，启动 Claude Code / Codex / PyAgent / DSH 或自定义命令，引入文件路径；读取修改、预览差异、检测冲突、确认写回。
+3. 写作闭环：编辑器、命令面板和 AI 面板提供终端入口；一键导出当前最新正文到服务器 Markdown，启动 Claude Code / Codex / Pi / PyAgent / DSH 或自定义命令，引入文件路径；读取修改、预览差异、检测冲突、确认写回。
 4. 验证：真实交互终端、连接鉴权、文件边界、写回保护、类型检查、中英文检查和生产构建。
 
 ## 快速启动（在 Inkstone 部署服务器上）
@@ -55,6 +55,19 @@ sudo journalctl -u inkstone-terminal -n 20 --no-pager
 ```
 
 服务开机自动启动，用户通过网站点击即可唤醒终端。重启服务会结束已有会话，重新点击即可连接。模板使用专用用户和私有 HOME，CLI 应安装到 `/var/lib/inkstone-terminal/.local/bin` 或模板 PATH 下并以该用户登录；现有 root 用户的 CLI 配置不会被继承。模板限制文件写入到 `/var/lib/inkstone-terminal`，如工具需要其他工作目录，应明确调整 `ReadWritePaths`。不要把密码或 API Key 提交到仓库。
+
+## 终端工具与布局
+
+终端标题栏可选择顶部、底部、左侧、右侧或浮动窗口。拖动停靠边界可调整比例；浮动时拖动标题栏移动窗口，拖动右下角缩放。位置和尺寸保存在当前浏览器，切换布局保留终端连接。窗口会在浏览器缩小时自动移回可见范围。
+
+`pi: command not found` 表示运行终端服务的专用账户没有安装 Pi，或其 PATH 缺少安装目录。以该用户安装（以下需要该环境已有 Node 和 npm）：
+
+```bash
+sudo install -d -o inkstone-terminal -g inkstone-terminal /var/lib/inkstone-terminal/.local
+sudo -u inkstone-terminal env HOME=/var/lib/inkstone-terminal PATH=/usr/local/bin:/usr/bin:/bin npm install --global --prefix /var/lib/inkstone-terminal/.local @mariozechner/pi-coding-agent@0.73.1
+```
+
+如果 Node 和 npm 使用其他路径，请将它们的目录加入命令和 systemd 的 PATH。连接服务会将自身 Node 所在目录及专用用户的 `~/.local/bin` 加入 shell PATH，使 `#!/usr/bin/env node` 启动的 CLI 能找到运行时。安装后在网页终端执行 `pi --version`，再运行 `pi` 并按工具提示配置模型或登录。
 
 ## 写作流程
 

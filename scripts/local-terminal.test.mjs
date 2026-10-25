@@ -126,3 +126,25 @@ test('owner session mode starts directly and fails closed for missing, rejected 
     await rm(workspace, { recursive: true, force: true });
   }
 });
+
+test('shell can run Node CLI tools when the inherited PATH omits the runtime', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'inkstone-runtime-path-'));
+  const bridge = await startTerminalBridge({ origins: [origin], port: 0, workspace, shell: '/bin/sh' });
+  const inheritedPath = process.env.PATH;
+  try {
+    process.env.PATH = '/nonexistent';
+    const { ws, receive, send } = await connect(bridge);
+    await receive('ready');
+    process.env.PATH = inheritedPath;
+    send({ type: 'input', data: "node -p 'process.version'\r" });
+    let output = '';
+    while (!output.includes(process.version)) output += (await receive('output')).data;
+    assert.doesNotMatch(output, /not found/);
+    ws.close(1000);
+    await new Promise((resolve) => ws.once('close', resolve));
+  } finally {
+    process.env.PATH = inheritedPath;
+    await bridge.close();
+    await rm(workspace, { recursive: true, force: true });
+  }
+});

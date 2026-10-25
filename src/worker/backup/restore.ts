@@ -2,11 +2,12 @@
  * of bidirectional sync. Restores then flow through the standard import
  * path, so conflict rules and version-safe writes are unchanged. */
 import { LIMITS } from '@shared/constants'
-import type { BackupTargetConfig, S3Config } from '@shared/types'
+import type { BackupTargetConfig, S3Config, WebdavConfig } from '@shared/types'
 import { client, objectUrl, type S3Secret } from './s3'
 import {
   childUrl,
   webdavFetch,
+  resolveWebdavBase,
 } from './webdav'
 
 const RESTORE_MAX_BYTES = Math.min(LIMITS.importUploadMaxBytes * 4, 512 * 1024 * 1024)
@@ -40,16 +41,14 @@ export async function fetchBackupArchive(
     const response = await aws.fetch(objectUrl(s3Config, key), { signal, redirect: 'manual' })
     return readAll(response, stamp)
   }
-  const webdav = config as { url: string; username: string; prefix: string }
-  const base = new URL(webdav.url)
-  if (base.protocol !== 'https:' && base.protocol !== 'http:') throw new Error('Invalid WebDAV URL')
-  const auth = 'Basic ' + btoa(`${webdav.username}:${secret.password ?? ''}`)
+  const webdav = config as WebdavConfig
+  const { base, auth } = await resolveWebdavBase(webdav, secret, signal)
   const target = webdavPath(webdav, stamp)
   const response = await webdavFetch(childUrl(base, target), {
     method: 'GET',
     headers: { Authorization: auth },
     signal,
-  }, base.origin, false)
+  }, base.origin)
   return readAll(response, stamp)
 }
 

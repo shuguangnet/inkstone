@@ -1,6 +1,7 @@
 export const TERMINAL_TOOLS = [
   { name: 'Claude Code', command: 'claude' },
   { name: 'Codex', command: 'codex' },
+  { name: 'Pi', command: 'pi' },
   { name: 'PyAgent', command: 'pyagent' },
   { name: 'DSH', command: 'dsh' },
 ] as const;

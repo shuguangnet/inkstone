@@ -155,7 +155,7 @@ export function BackupSettings() {
         {targets.length === 0 ? (<div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-default)]">
             <Empty art="archive" compact title={t("settings.no_backup_target_yet")} description={t("settings.add_a_webdav_or_s3_compatible_target_or_choose_a_common_provider_preset")} action={<Button size="sm" icon={<Plus size={13}/>} onClick={() => setEditing('new')}>{t("settings.add_first_target")}</Button>}/>
           </div>) : (<div className="space-y-2">
-            {targets.map((target) => (<TargetCard key={target.id} target={target} onEdit={() => setEditing(target)} onChanged={reload} onPatch={(id, patch) => setTargets((current) => current?.map((item) => item.id === id ? { ...item, ...patch } : item) ?? current)} onRemove={(id) => setTargets((current) => current?.filter((item) => item.id !== id) ?? current)} onRestore={(removed) => setTargets((current) => current && !current.some((item) => item.id === removed.id) ? [...current, removed] : current)}/>))}
+            {targets.map((target) => (<TargetCard key={target.id} target={target} onEdit={(url) => setEditing(url && target.type === 'webdav' ? { ...target, config: { ...target.config, url } } : target)} onChanged={reload} onPatch={(id, patch) => setTargets((current) => current?.map((item) => item.id === id ? { ...item, ...patch } : item) ?? current)} onRemove={(id) => setTargets((current) => current?.filter((item) => item.id !== id) ?? current)} onRestore={(removed) => setTargets((current) => current && !current.some((item) => item.id === removed.id) ? [...current, removed] : current)}/>))}
           </div>)}
       </section>
 
@@ -189,7 +189,7 @@ export function BackupSettings() {
 
 function TargetCard({ target, onEdit, onChanged, onPatch, onRemove, onRestore, }: {
     target: BackupTarget;
-    onEdit: () => void;
+    onEdit: (url?: string) => void;
     onChanged: () => Promise<void>;
     onPatch: (id: string, patch: Partial<BackupTarget>) => void;
     onRemove: (id: string) => void;
@@ -233,10 +233,11 @@ function TargetCard({ target, onEdit, onChanged, onPatch, onRemove, onRestore, }
                 ? 'bg-[color-mix(in_oklab,var(--success)_12%,transparent)] text-[var(--success)]'
                 : 'bg-[color-mix(in_oklab,var(--danger)_11%,transparent)] text-[var(--danger)]')}>
               {result.ok ? <CheckCircle2 size={11} className="mt-px"/> : <AlertCircle size={11} className="mt-px"/>}
-              <span className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1">
                 {translateServiceMessage(result.message)}
                 {result.latencyMs ? ` · ${result.latencyMs}ms` : ''}
-              </span>
+                {result.redirectUrl && <RedirectNotice url={result.redirectUrl} onAccept={() => onEdit(result.redirectUrl)} label={t('settings.edit_redirect_address')}/>}
+              </div>
             </div>)}
         </div>
 
@@ -280,7 +281,7 @@ function TargetCard({ target, onEdit, onChanged, onPatch, onRemove, onRestore, }
             {testing ? <Loader2 size={12} className="animate-[ink-spin_.7s_linear_infinite]"/> : t("settings.test")}
           </Button>
           <Tooltip label={t("common.edit")}>
-            <IconButton label={t("common.edit")} size="sm" disabled={busy} onClick={onEdit}>
+            <IconButton label={t("common.edit")} size="sm" disabled={busy} onClick={() => onEdit()}>
               <MoreHorizontal size={14}/>
             </IconButton>
           </Tooltip>
@@ -346,7 +347,13 @@ function TargetForm({ target, onClose, onSaved, }: {
     const actionRef = useRef(false);
     const toast = useUi((s) => s.toast);
     const canKeepSecret = Boolean(target?.hasSecret && type === target.type);
-    useEffect(() => setResult(null), [type, form, secret]);
+    const resultInputs = useRef({ type, form, secret });
+    useEffect(() => {
+        if (resultInputs.current.type !== type || resultInputs.current.form !== form || resultInputs.current.secret !== secret) {
+            setResult(null);
+            resultInputs.current = { type, form, secret };
+        }
+    }, [type, form, secret]);
     const applyFields = (fields: BackupPreset['fields']) => {
         setForm((f) => ({
             ...f,
@@ -417,7 +424,7 @@ function TargetForm({ target, onClose, onSaved, }: {
             setSaving(false);
         }
     };
-    const test = async () => {
+    const test = async (redirectUrl?: string) => {
         if (actionRef.current)
             return;
         actionRef.current = true;
@@ -425,9 +432,19 @@ function TargetForm({ target, onClose, onSaved, }: {
         setResult(null);
         try {
             const payload = buildPayload();
-            setResult(target
+            if (redirectUrl && type === 'webdav') {
+                payload.config = { ...payload.config, url: redirectUrl };
+                setForm((previous) => ({ ...previous, url: redirectUrl }));
+            }
+            const response = target
                 ? await api.backup.test(target.id, payload)
-                : await api.backup.testDraft(payload));
+                : await api.backup.testDraft(payload);
+            if (response.ok && response.resolvedUrl && type === 'webdav') {
+                const resolvedForm = { ...form, url: response.resolvedUrl };
+                resultInputs.current = { type, form: resolvedForm, secret };
+                setForm(resolvedForm);
+            }
+            setResult(response);
         }
         catch (err) {
             setResult({ ok: false, message: err instanceof ApiError ? err.message : String(err) });
@@ -556,7 +573,10 @@ function TargetForm({ target, onClose, onSaved, }: {
                 ? 'bg-[color-mix(in_oklab,var(--success)_12%,transparent)] text-[var(--success)]'
                 : 'bg-[color-mix(in_oklab,var(--danger)_11%,transparent)] text-[var(--danger)]')}>
             {result.ok ? (<CheckCircle2 size={13} className="mt-px shrink-0"/>) : (<AlertCircle size={13} className="mt-px shrink-0"/>)}
-            <span>{translateServiceMessage(result.message)}</span>
+            <div className="min-w-0 flex-1">
+              <span>{translateServiceMessage(result.message)}</span>
+              {result.redirectUrl && type === 'webdav' && <RedirectNotice url={result.redirectUrl} onAccept={() => void test(result.redirectUrl)} label={t('settings.trust_redirect_and_retest')}/>}
+            </div>
           </div>)}
       </fieldset>
     </Modal>);
@@ -594,4 +614,12 @@ function RunRow({ run }: {
             </li>))}
         </ul>)}
     </li>);
+}
+
+function RedirectNotice({ url, onAccept, label }: { url: string; onAccept: () => void; label: string }) {
+    return <div className="mt-2 space-y-2 text-[var(--text-secondary)]">
+      <code className="block break-all select-text">{url}</code>
+      <p>{t('settings.redirect_trust_hint')}</p>
+      <Button size="sm" variant="secondary" onClick={onAccept}>{label}</Button>
+    </div>;
 }

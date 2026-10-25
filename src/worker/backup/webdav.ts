@@ -42,6 +42,18 @@ export function childUrl(base: URL, relative: string): string {
 
 const WEBDAV_REDIRECTS = new Set([301, 302, 307, 308])
 const MAX_WEBDAV_REDIRECTS = 4
+const PCLOUD_WEBDAV_ORIGINS = new Set(['https://webdav.pcloud.com', 'https://ewebdav.pcloud.com'])
+
+export class WebdavRedirectError extends Error {
+  constructor(readonly redirectUrl: string) {
+    super('WebDAV redirected to another origin. Enter the final HTTPS URL to protect credentials')
+    this.name = 'WebdavRedirectError'
+  }
+}
+
+function trustedWebdavOrigin(origin: string, trustedOrigin: string): boolean {
+  return origin === trustedOrigin || (PCLOUD_WEBDAV_ORIGINS.has(origin) && PCLOUD_WEBDAV_ORIGINS.has(trustedOrigin))
+}
 
 export async function webdavFetch(
   input: string | URL,
@@ -49,31 +61,32 @@ export async function webdavFetch(
   trustedOrigin: string,
   replayable = true,
 ): Promise<Response> {
-  let current = new URL(input)
+  return (await followWebdavRedirects(input, init, trustedOrigin, replayable)).response
+}
+
+async function followWebdavRedirects(
+  input: string | URL,
+  init: RequestInit,
+  trustedOrigin: string,
+  replayable = true,
+): Promise<{ response: Response; url: URL }> {
+  let current = parseBackupEndpoint(String(input), 'WebDAV address')
+  if (!trustedWebdavOrigin(current.origin, trustedOrigin)) throw new WebdavRedirectError(current.toString())
 
   for (let redirects = 0; redirects <= MAX_WEBDAV_REDIRECTS; redirects++) {
     const response = await fetch(current, { ...init, redirect: 'manual' })
-    if (!WEBDAV_REDIRECTS.has(response.status)) return response
+    if (!WEBDAV_REDIRECTS.has(response.status)) return { response, url: current }
 
     const location = response.headers.get('Location')
-    if (!location) return response
+    if (!location) return { response, url: current }
+    await response.body?.cancel().catch(() => {})
     if (redirects === MAX_WEBDAV_REDIRECTS) {
-      await response.body?.cancel().catch(() => {})
       throw new Error('Too many WebDAV redirects')
     }
 
-    const next = new URL(location, current)
-    if (
-      next.protocol !== 'https:' ||
-      next.origin !== trustedOrigin ||
-      next.username ||
-      next.password
-    ) {
-      await response.body?.cancel().catch(() => {})
-      throw new Error('WebDAV redirected to another origin. Enter the final HTTPS URL to protect credentials')
-    }
+    const next = parseBackupEndpoint(new URL(location, current).toString(), 'WebDAV address')
+    if (!trustedWebdavOrigin(next.origin, trustedOrigin)) throw new WebdavRedirectError(next.toString())
 
-    await response.body?.cancel().catch(() => {})
     if (!replayable) {
       throw new Error('WebDAV redirected the streaming upload. Enter the final WebDAV HTTPS URL and try again')
     }
@@ -81,6 +94,22 @@ export async function webdavFetch(
   }
 
   throw new Error('Too many WebDAV redirects')
+}
+
+export async function resolveWebdavBase(config: WebdavConfig, secret: WebdavSecret, signal?: AbortSignal): Promise<{ base: URL; auth: string }> {
+  const initial = baseUrl(config)
+  const auth = authHeader(config, secret)
+  const { response, url } = await followWebdavRedirects(initial, {
+    method: 'PROPFIND',
+    headers: { Authorization: auth, Depth: '0', 'Content-Type': 'application/xml', 'User-Agent': BACKUP_USER_AGENT },
+    signal,
+  }, initial.origin)
+  await response.body?.cancel().catch(() => {})
+  if (response.status === 401) throw new Error('Incorrect username or password')
+  if (response.status === 404) throw new Error('The path does not exist. Check the URL')
+  if (!response.ok && response.status !== 405) throw new Error(`Server returned HTTP ${response.status}`)
+  if (!url.pathname.endsWith('/')) url.pathname += '/'
+  return { base: url, auth }
 }
 
 async function ensureDirs(
@@ -129,20 +158,20 @@ export async function webdavDeliverArchive(
   archive: BackupArchive,
   signal?: AbortSignal,
 ): Promise<DeliverResult> {
-  const base = baseUrl(config)
-  const auth = authHeader(config, secret)
+  const { base, auth } = await resolveWebdavBase(config, secret, signal)
   const prefix = normalizeBackupPrefix(config.prefix ?? '')
   const target = [prefix, `backups/${archive.filename}`].filter(Boolean).join('/')
   const targetDir = target.slice(0, target.lastIndexOf('/'))
   await ensureDirs(base, auth, targetDir ? [targetDir] : [], new Set(), signal)
-  if (await webdavObjectMatches(base, auth, target, archive.byteLengthNumber, signal)) {
+  const object = await webdavObjectMatches(base, auth, target, archive.byteLengthNumber, signal)
+  if (object.matches) {
     await archive.stream.cancel().catch(() => {})
     return { files: 1, bytes: archive.byteLengthNumber }
   }
 
   const fixed = new FixedLengthStream(archive.byteLength)
   const pump = archive.stream.pipeTo(fixed.writable, { signal })
-  const upload = webdavFetch(childUrl(base, target), {
+  const upload = webdavFetch(object.url, {
     method: 'PUT',
     headers: {
       Authorization: auth,
@@ -172,20 +201,19 @@ async function webdavObjectMatches(
   target: string,
   expectedBytes: number,
   signal?: AbortSignal,
-): Promise<boolean> {
-  const response = await webdavFetch(childUrl(base, target), {
+): Promise<{ matches: boolean; url: URL }> {
+  const { response, url } = await followWebdavRedirects(childUrl(base, target), {
     method: 'HEAD',
     headers: { Authorization: auth, 'User-Agent': BACKUP_USER_AGENT },
     signal,
   }, base.origin)
   await response.body?.cancel().catch(() => {})
-  if (response.status === 404) return false
-  if (response.status === 405 || response.status === 501) return false
+  if (response.status === 404 || response.status === 405 || response.status === 501) return { matches: false, url }
   if (response.status === 401) throw new Error('Incorrect username or password')
   if (response.status === 403) throw new Error('Read access is missing')
   if (!response.ok) throw new Error(`Checking ${target} failed: HTTP ${response.status}`)
   const size = Number(response.headers.get('Content-Length'))
-  return size === expectedBytes
+  return { matches: size === expectedBytes, url }
 }
 
 export async function webdavTest(
@@ -195,20 +223,12 @@ export async function webdavTest(
 ): Promise<TestConnectionResult> {
   const started = Date.now()
   try {
-    const base = baseUrl(config)
-    const auth = authHeader(config, secret)
-
-    const probe = await webdavFetch(base.toString(), {
-      method: 'PROPFIND',
-      headers: { Authorization: auth, Depth: '0', 'Content-Type': 'application/xml', 'User-Agent': BACKUP_USER_AGENT },
-      signal,
-    }, base.origin)
-    await probe.body?.cancel().catch(() => {})
-    if (probe.status === 401) return { ok: false, message: "Incorrect username or password" }
-    if (probe.status === 404) return { ok: false, message: 'The path does not exist. Check the URL' }
-    if (!probe.ok && probe.status !== 207 && probe.status !== 405) {
-      return { ok: false, message: `Server returned HTTP ${probe.status}` }
-    }
+    const connection = await resolveWebdavBase(config, secret, signal).catch((error: unknown) => {
+      if (error instanceof WebdavRedirectError) return error
+      throw error
+    })
+    if (connection instanceof WebdavRedirectError) return { ok: false, message: connection.message, redirectUrl: connection.redirectUrl }
+    const { base, auth } = connection
 
     const prefix = normalizeBackupPrefix(config.prefix ?? '')
     if (prefix) await ensureDirs(base, auth, [prefix], new Set(), signal)
@@ -251,7 +271,7 @@ export async function webdavTest(
       }
 
       readWriteSucceeded = true
-      return { ok: true, message: 'Connection succeeded with read and write access', latencyMs: Date.now() - started }
+      return { ok: true, message: 'Connection succeeded with read and write access', latencyMs: Date.now() - started, resolvedUrl: base.toString() }
     } finally {
       if (written) {
         let cleanupError: Error | null = null

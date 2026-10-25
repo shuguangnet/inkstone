@@ -9,7 +9,7 @@ import type { EditorLayout } from '@shared/types';
 import { fullTime } from '../../lib/time';
 import { useBreakpoint, useRelativeTime } from '../../lib/hooks';
 import { prettyCombo } from '../../lib/hotkeys';
-import { Button, IconButton } from '../../components/primitives';
+import { Button, IconButton, Kbd } from '../../components/primitives';
 import { Drawer, Menu, Tooltip, type MenuItem } from '../../components/overlay';
 import { Input, Segmented } from '../../components/form';
 import { EditorSkeleton, Empty } from '../../components/feedback';
@@ -481,12 +481,22 @@ export function Workspace({ mobileLayout = 'edit', onMobileBack, pane = 'active'
         </div>
       </header>
 
-      {!immersive && settings.editor.showToolbar && showEditor && (<EditorToolbar runCommand={runEditorCommand} mobile={isMobile} onPickImage={() => fileInputRef.current?.click()}/>)}
+      {(immersive || settings.editor.showToolbar) && showEditor && (<EditorToolbar runCommand={runEditorCommand} mobile={isMobile} onPickImage={() => fileInputRef.current?.click()}/>)}
 
-      {immersive && <div className="flex shrink-0 items-center justify-center gap-4 py-2 text-xs text-[var(--text-tertiary)]">
-        <label className="flex items-center gap-1.5"><input type="checkbox" checked={settings.editor.focusMode} onChange={(event) => void updateSettings({ editor: { focusMode: event.target.checked } })}/>{t('writing.focus')}</label>
-        <label className="flex items-center gap-1.5"><input type="checkbox" checked={settings.editor.typewriter} onChange={(event) => void updateSettings({ editor: { typewriter: event.target.checked } })}/>{t('writing.typewriter')}</label>
-        <SaveIndicator />
+      {immersive && <div aria-label={t('writing.quick_guide')} className="shrink-0 border-b border-[var(--border-subtle)] px-3 py-2 text-xs text-[var(--text-tertiary)]">
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5">
+          <strong className="font-medium text-[var(--text-secondary)]">{t('writing.quick_guide')}</strong>
+          <span className="inline-flex items-center gap-1.5">{t('common.bold')}<Kbd combo="mod+b"/></span>
+          <span className="inline-flex items-center gap-1.5">{t('common.italic')}<Kbd combo="mod+i"/></span>
+          <span className="inline-flex items-center gap-1.5">{t('workspace.title_level')}<Kbd combo="mod+1"/></span>
+          <span className="inline-flex items-center gap-1.5">{t('writing.exit')}<Kbd combo="escape"/></span>
+        </div>
+        <p className="mt-1 text-center leading-relaxed">{t('writing.markdown_hint')}</p>
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-4">
+          <label className="flex items-center gap-1.5"><input type="checkbox" checked={settings.editor.focusMode} onChange={(event) => void updateSettings({ editor: { focusMode: event.target.checked } })}/>{t('writing.focus')}</label>
+          <label className="flex items-center gap-1.5"><input type="checkbox" checked={settings.editor.typewriter} onChange={(event) => void updateSettings({ editor: { typewriter: event.target.checked } })}/>{t('writing.typewriter')}</label>
+          <SaveIndicator />
+        </div>
       </div>}
       <SelectionToolbar view={view}/>
 
