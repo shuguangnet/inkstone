@@ -6,5 +6,17 @@
 :8080 {
 	@scheduled path /_internal/scheduled*
 	respond @scheduled 404
-	reverse_proxy app:7712
+	@drawioBackend path /drawio/proxy* /drawio/export* /drawio/service* /drawio/i/* /drawio/log /drawio/github2* /drawio/microsoft* /drawio/google* /drawio/gitlab* /drawio/dropbox*
+	respond @drawioBackend 404
+	handle /drawio/* {
+		header Access-Control-Allow-Origin "*"
+		header Content-Security-Policy "default-src 'self'; base-uri 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src 'self' blob:; frame-ancestors 'self'; form-action 'self'; object-src 'none'"
+		reverse_proxy drawio:8080 {
+			header_up -Cookie
+			header_up -Authorization
+		}
+	}
+	handle {
+		reverse_proxy app:7712
+	}
 }

@@ -13,6 +13,7 @@ import { assertContentSize } from '../lib/request'
 import { enqueueNoteIndex } from './ai-search'
 import { runIdempotent } from './operations'
 import { buildOutline } from './retrieval'
+import { createDrawioBlock, listDrawioBlocks } from '@shared/drawio'
 
 export type NoteEditOperation = 'replace' | 'replace_section' | 'append' | 'prepend' | 'replace_all'
 
@@ -21,6 +22,36 @@ export interface McpWriteContext {
   userId: string
   ftsEnabled: boolean
   executionCtx: ExecutionContext
+}
+
+export async function upsertMcpDiagram(context: McpWriteContext, input: {
+  operationId: string
+  noteId: string
+  expectedRev: number
+  diagramId: string
+  title: string
+  xml: string
+}): Promise<Note> {
+  let replacement: string
+  try { replacement = createDrawioBlock(input.xml, input.diagramId, input.title) }
+  catch (error) { throw ApiError.badRequest(error instanceof Error ? error.message : 'Invalid Draw.io XML') }
+  return runIdempotent({
+    db: context.env.DB,
+    userId: context.userId,
+    operationId: input.operationId,
+    tool: 'upsert_diagram',
+    request: input,
+    execute: async () => {
+      const current = await loadNoteRow(context.env.DB, context.userId, input.noteId)
+      assertExpectedRevision(current, input.expectedRev)
+      if (current.deleted_at !== null) throw ApiError.notFound('The note is in the trash')
+      const matches = listDrawioBlocks(current.content).filter((block) => block.id === input.diagramId)
+      if (matches.length > 1) throw ApiError.conflict('This diagram id appears more than once in the note')
+      const block = matches[0]
+      const content = block ? current.content.slice(0, block.from) + replacement + current.content.slice(block.to) : `${current.content.trimEnd()}\n\n${replacement}\n`
+      return patchNote(context, current, { content })
+    },
+  })
 }
 
 export async function createMcpNote(

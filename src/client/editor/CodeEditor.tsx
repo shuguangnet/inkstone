@@ -22,6 +22,7 @@ export interface CodeEditorProps {
     onChange: (value: string) => void;
     settings: EditorSettings;
     previewOptions?: LivePreviewOptions;
+    onEditDiagram?: (id: string, xml: string) => void;
     sources: CompletionSources;
     handlers: PasteHandlers;
     onReady?: (view: EditorView | null) => void;
@@ -30,12 +31,12 @@ export interface CodeEditorProps {
     placeholder?: string;
     className?: string;
 }
-export function CodeEditor({ value, onChange, settings, previewOptions = { math: true, mermaid: true }, sources, handlers, onReady, onScroll, onCursorLine, placeholder = t("editor.start_writing"), className, }: CodeEditorProps) {
+export function CodeEditor({ value, onChange, settings, previewOptions = { math: true, mermaid: true }, onEditDiagram, sources, handlers, onReady, onScroll, onCursorLine, placeholder = t("editor.start_writing"), className, }: CodeEditorProps) {
     const hostRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
 
-    const cbRef = useRef({ onChange, onScroll, onCursorLine, sources, handlers });
-    cbRef.current = { onChange, onScroll, onCursorLine, sources, handlers };
+    const cbRef = useRef({ onChange, onScroll, onCursorLine, sources, handlers, onEditDiagram });
+    cbRef.current = { onChange, onScroll, onCursorLine, sources, handlers, onEditDiagram };
 
     const lineNumbersCompartment = useRef(new Compartment());
     const tabSizeCompartment = useRef(new Compartment());
@@ -79,7 +80,7 @@ export function CodeEditor({ value, onChange, settings, previewOptions = { math:
             }),
             editorTheme(),
             markdownDecorations,
-            livePreviewCompartment.current.of(settings.livePreview ? [livePreviewOptions.of(previewOptions), livePreview] : []),
+            livePreviewCompartment.current.of(settings.livePreview ? [livePreviewOptions.of({ ...previewOptions, onEditDiagram: (id, xml) => cbRef.current.onEditDiagram?.(id, xml) }), livePreview] : []),
             focusModePlugin,
             typewriterPlugin,
             pasteExtension(cbRef.current.handlers),
@@ -143,7 +144,7 @@ export function CodeEditor({ value, onChange, settings, previewOptions = { math:
     }, []);
 
     useEffect(() => {
-        viewRef.current?.dispatch({ effects: livePreviewCompartment.current.reconfigure(settings.livePreview ? [livePreviewOptions.of(previewOptions), livePreview] : []) });
+        viewRef.current?.dispatch({ effects: livePreviewCompartment.current.reconfigure(settings.livePreview ? [livePreviewOptions.of({ ...previewOptions, onEditDiagram: (id, xml) => cbRef.current.onEditDiagram?.(id, xml) }), livePreview] : []) });
     }, [settings.livePreview, previewOptions.math, previewOptions.mermaid]);
 
     useEffect(() => {

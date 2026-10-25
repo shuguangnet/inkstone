@@ -6,6 +6,7 @@ import { api, ApiError } from '../../lib/api';
 import { fullTime } from '../../lib/time';
 import { readingMinutes, countText } from '@shared/markdown-utils';
 import { renderMarkdown } from '../../lib/markdown/renderer';
+import { hydrateDrawio } from '../../lib/markdown/drawio';
 import { enhancePreview, renderPendingMermaid, resetMermaidNode, toggleCodeBlockCollapse } from '../../lib/markdown/enhance';
 import { Avatar, Button, Logo } from '../../components/primitives';
 import { Input } from '../../components/form';
@@ -100,6 +101,8 @@ export function SharePage({ slug }: {
         if (!rendered || !hostRef.current)
             return;
         const host = hostRef.current;
+        host.querySelectorAll('[data-drawio-edit]').forEach((button) => button.remove());
+        hydrateDrawio(host);
         const revision = ++enhancementRevisionRef.current;
         let cancelled = false;
         const isCurrent = () => !cancelled && enhancementRevisionRef.current === revision && hostRef.current === host;

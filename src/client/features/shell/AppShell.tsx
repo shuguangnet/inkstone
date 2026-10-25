@@ -30,6 +30,7 @@ import { t } from "../../lib/i18n";
 import { SettingsPanel } from '../settings/SettingsPanel';
 import { scheduleSettingsWarmup } from '../settings/sections';
 const TerminalPanel = lazy(() => import('../terminal/TerminalPanel').then((m) => ({ default: m.TerminalPanel })));
+const DrawioDialog = lazy(() => import('../diagrams/DrawioDialog').then((m) => ({ default: m.DrawioDialog })));
 const Workspace = lazy(() => import('../workspace/Workspace').then((m) => ({ default: m.Workspace })));
 const CommandPalette = lazy(() => import('../command/CommandPalette').then((m) => ({ default: m.CommandPalette })));
 const ShortcutsPanel = lazy(() => import('../command/ShortcutsPanel').then((m) => ({ default: m.ShortcutsPanel })));
@@ -218,6 +219,7 @@ function OverlayHost() {
     return (<>
       {panel === 'settings' && <SettingsPanel key={userId} onClose={closePanel}/>}
       <Suspense fallback={null}>
+        <DrawioDialog />
         {panel === 'command' && <CommandPalette onClose={closePanel}/>}
         {panel === 'shortcuts' && <ShortcutsPanel onClose={closePanel}/>}
         {panel === 'graph' && <GraphPanel onClose={closePanel}/>}

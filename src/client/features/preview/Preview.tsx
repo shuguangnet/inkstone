@@ -30,6 +30,8 @@ import { previewSourceAnchors } from './preview-anchors'
 import { moveMarkdownTabFocus, selectMarkdownTab } from './markdown-tabs'
 import { capturePreviewInteractionState, restorePreviewInteractionState } from './preview-state'
 import { preferredScrollBehavior } from '../../lib/motion'
+import { hydrateDrawio } from '../../lib/markdown/drawio'
+import { editDiagram } from '../diagrams/store'
 
 export interface PreviewProps {
   content: string
@@ -203,6 +205,7 @@ export const Preview = memo(function Preview({
     pendingViewportRef.current = null
     const scroller = scrollerRef.current
     const host = hostRef.current
+    if (host) hydrateDrawio(host)
     if (snapshot && scroller && host) restorePreviewViewport(scroller, host, snapshot)
     onRendered?.()
   }, [committedHtml, onRendered, scrollerRef])
@@ -210,6 +213,12 @@ export const Preview = memo(function Preview({
 
   const onClick = (event: React.MouseEvent) => {
     const target = event.target as HTMLElement
+    const diagram = target.closest<HTMLElement>('[data-drawio-edit]')?.closest<HTMLElement>('[data-drawio]')
+    if (diagram) {
+      event.preventDefault()
+      if (sourceNoteId) editDiagram(sourceNoteId, diagram.dataset.drawioId ?? '', decodeDataValue(diagram.dataset.drawio))
+      return
+    }
 
     const mermaidRetry = target.closest<HTMLElement>('[data-mermaid-retry]')
     if (mermaidRetry) {

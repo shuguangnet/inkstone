@@ -6,6 +6,7 @@ import footnote from 'markdown-it-footnote';
 import anchor from 'markdown-it-anchor';
 import mark from 'markdown-it-mark';
 import DOMPurify from 'dompurify';
+import { drawioFenceInfo } from '@shared/drawio';
 import { parseFrontMatter, slugifyHeading } from '@shared/markdown-utils';
 import { getLocale, t } from '../i18n';
 import { encodeDataValue } from './data-attr';
@@ -248,6 +249,7 @@ md.renderer.rules.math_inline = (tokens, index) => `<span class="math-inline" da
 md.renderer.rules.math_block = (tokens, index) => {
     const token = tokens[index]!;
     const line = token.map ? ` data-line="${token.map[0]}"` : '';
+
     return `<div class="math-block"${line} data-math="${escapeAttr(encodeDataValue(token.content))}"></div>`;
 };
 const WIKI_RE = /^\[\[([^\[\]\n]{1,400})\]\]/;
@@ -462,6 +464,10 @@ md.renderer.rules.fence = (tokens, index, _options, rendererEnv) => {
     const token = tokens[index]!;
     const info = parseFenceInfo(token.info);
     const line = token.map ? ` data-line="${token.map[0]}"` : '';
+    const drawio = drawioFenceInfo(token.info);
+    if (drawio) {
+        return `<figure class="drawio-block"${line} data-drawio="${escapeAttr(encodeDataValue(token.content))}" data-drawio-id="${escapeAttr(drawio.id)}" data-drawio-title="${escapeAttr(drawio.title)}"><figcaption><span>${escapeHtml(drawio.title)}</span><button type="button" class="drawio-edit" data-drawio-edit>${escapeHtml(t('drawio.edit'))}</button></figcaption><div class="drawio-placeholder">${escapeHtml(t('drawio.loading'))}</div></figure>`;
+    }
     if (info.language === 'md-example' || info.language === 'markdown-example') {
         const parentEnv = renderEnv(rendererEnv);
         const exampleId = ++parentEnv.exampleSequence;

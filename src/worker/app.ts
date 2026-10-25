@@ -34,15 +34,15 @@ export function createApp() {
     const imageSchemes = isHttps ? 'https:' : 'https: http:'
     const formAction = authorizationFormAction(c.req.url, c.res)
     c.header('X-Content-Type-Options', 'nosniff')
-    c.header('X-Frame-Options', 'DENY')
+    c.header('X-Frame-Options', c.req.path === '/drawio-viewer.html' ? 'SAMEORIGIN' : 'DENY')
     c.header('Referrer-Policy', 'strict-origin-when-cross-origin')
     c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
     c.header(
       'Content-Security-Policy',
         "default-src 'self'; base-uri 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
         `img-src 'self' data: blob: ${imageSchemes}; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; ` +
-        `manifest-src 'self'; media-src 'self' blob:; form-action ${formAction}; frame-src 'none'; ` +
-        "frame-ancestors 'none'; object-src 'none'",
+        `manifest-src 'self'; media-src 'self' blob:; form-action ${formAction}; frame-src 'self'; ` +
+        `frame-ancestors ${c.req.path === '/drawio-viewer.html' ? "'self'" : "'none'"}; object-src 'none'`,
     )
     if (isHttps) {
       c.header('Strict-Transport-Security', 'max-age=31536000')

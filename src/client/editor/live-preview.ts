@@ -4,10 +4,13 @@ import { Decoration, EditorView, WidgetType, type DecorationSet } from '@codemir
 import { renderMarkdown } from '../lib/markdown/renderer'
 import { enhancePreview, renderPendingMermaid } from '../lib/markdown/enhance'
 import { t } from '../lib/i18n'
+import { hydrateDrawio } from '../lib/markdown/drawio'
+import { decodeDataValue } from '../lib/markdown/data-attr'
 
 export interface LivePreviewOptions {
   math: boolean
   mermaid: boolean
+  onEditDiagram?: (id: string, xml: string) => void
 }
 
 export const livePreviewOptions = Facet.define<LivePreviewOptions, LivePreviewOptions>({
@@ -31,12 +34,18 @@ class RenderedMarkdown extends WidgetType {
     dom.setAttribute('aria-label', t('editor.edit_rendered'))
     dom.tabIndex = 0
     dom.innerHTML = renderMarkdown(this.source).html
-    dom.querySelectorAll('button, .heading-anchor').forEach((node) => node.remove())
+    dom.querySelectorAll('button:not([data-drawio-edit]), .heading-anchor').forEach((node) => node.remove())
+    hydrateDrawio(dom)
     if (!this.block) {
       const paragraph = dom.querySelector('p')
       if (paragraph) paragraph.replaceWith(...paragraph.childNodes)
     }
     const edit = (target: EventTarget | null) => {
+      const diagram = target instanceof Element ? target.closest<HTMLElement>('[data-drawio]') : null
+      if (diagram && this.options.onEditDiagram) {
+        this.options.onEditDiagram(diagram.dataset.drawioId ?? '', decodeDataValue(diagram.dataset.drawio))
+        return
+      }
       const start = view.posAtDOM(dom)
       const sourceLine = target instanceof Element ? Number(target.closest('[data-line]')?.getAttribute('data-line') ?? 0) : 0
       const offset = Number.isSafeInteger(sourceLine) && sourceLine >= 0 ? sourceLine : 0
@@ -134,7 +143,10 @@ function buildPreview(state: EditorState, focused: boolean): DecorationSet {
       const { from, to, name } = ref
       const node = ref.node
       if (name === 'FencedCode' || name === 'CodeBlock' || name === 'Table' || name === 'HTMLBlock' || name === 'HorizontalRule') {
-        if (!active(from, to, true)) render(from, to, true, name)
+        const diagram = name === 'FencedCode' && /^\s*(?:`{3,}|~{3,})drawio(?:\s|$)/i.test(state.sliceDoc(from, to))
+        const selection = state.selection.main
+        const selected = !selection.empty && selection.from < to && selection.to > from
+        if (diagram ? !selected : !active(from, to, true)) render(from, to, true, name)
         else lineStyle(from, to, name === 'Table' ? 'cm-live-table-source' : name === 'FencedCode' || name === 'CodeBlock' ? 'cm-md-codeblock-line' : 'cm-md-meta')
         protectedRanges.push({ from, to })
         return false

@@ -32,6 +32,7 @@ Every new account automatically receives two standard starter notes, one in Chin
 | Organization | Nested folders with drag-and-drop ordering, inline tags, favorites, pinning, archive, trash, **wiki links**, backlinks, block references, note embeds, and a relationship graph |
 | Search | D1 FTS5 **full-text search** with Chinese indexing, filters, recent notes, command-palette navigation, and optional private **semantic/hybrid search** powered by Workers AI |
 | **MCP** | Private remote MCP, OAuth 2.1 with PKCE, revocable `ink_...` API keys, standard `search`/`fetch`, bounded reads, revision-safe writes, separate trash permission, and per-account grant management |
+| Diagrams | Built-in self-hosted Draw.io editor, editable diagrams in Markdown, live rendering, and MCP tools for Agent drawing. See [Draw.io guide](./DRAWIO.md). |
 | Reliability | Installable PWA, offline app launch, browser-side cache, **offline write queue and optimistic concurrency control**, immediate local mutations with rollback, stale-sync protection, conflict copies, realtime notifications, and elected-tab polling fallback |
 | Sharing | Public note links with optional access passwords and expiration dates |
 | Portability | JSON and ZIP exports, directly readable **Markdown**, attachment export, and **manual or scheduled WebDAV/S3 backups** |

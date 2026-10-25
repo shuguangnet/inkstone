@@ -1,5 +1,22 @@
 import type { MessageKey } from './en-US';
 export const ZH_CN_MESSAGES = {
+    "drawio.title": "Draw.io 绘图",
+    "drawio.insert": "插入 Draw.io 图表",
+    "drawio.default_title": "未命名图表",
+    "drawio.name": "图表名称",
+    "drawio.edit": "编辑图表",
+    "drawio.loading": "正在加载 Draw.io…",
+    "drawio.load_error": "Draw.io 未能加载，请检查绘图服务后重新打开。",
+    "drawio.render_error": "图表无法渲染，请打开绘图编辑器检查。",
+    "drawio.save": "保存到笔记",
+    "drawio.saving": "正在保存…",
+    "drawio.save_error": "图表保存失败，请重试；当前绘图仍保留。",
+    "drawio.conflict": "绘图期间笔记或图表已发生变化，请先复制或导出当前图表，再重新打开。",
+    "drawio.note_unavailable": "原笔记已不可用，请在关闭前导出当前图表。",
+    "drawio.discard_title": "放弃绘图修改？",
+    "drawio.discard_hint": "未保存的修改将丢失，可先将图表保存到笔记。",
+    "drawio.discard": "放弃修改",
+
     "editor.live_preview": "即时渲染",
     "editor.show_source": "显示 Markdown 源码",
     "editor.live_preview_hint": "边写边显示排版效果，点击已渲染的内容即可继续编辑。",

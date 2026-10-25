@@ -94,6 +94,9 @@ const config: UserConfigFnPromise = async ({ mode, command }) => ({
   },
 
   server: {
+    proxy: {
+      '/drawio/': { target: process.env.INKSTONE_DRAWIO_DEV_URL || 'http://127.0.0.1:17813' },
+    },
 
     port: 7712,
     strictPort: false,

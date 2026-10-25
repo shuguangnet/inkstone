@@ -1,4 +1,5 @@
 import { renderMarkdown } from './markdown/renderer'
+import { inlineDrawioImages } from './markdown/drawio'
 
 const KATEX_CSS_URL = 'https://cdn.jsdelivr.net/npm/katex@0.18.1/dist/katex.min.css'
 
@@ -70,6 +71,7 @@ async function waitForPrintReady(iframe: HTMLIFrameElement): Promise<void> {
 
 async function inlinePrivateImages(html: string): Promise<string> {
   const doc = new DOMParser().parseFromString(html, 'text/html')
+  await inlineDrawioImages(doc.body)
   const images = [...doc.querySelectorAll<HTMLImageElement>('img[src^="/api/files/"]')]
   await Promise.all(images.map(async (image) => {
     try {
