@@ -6,12 +6,14 @@ import type { GraphResponse, SearchHit, SearchResponse } from '@shared/types'
 import type { AppBindings } from '../env'
 import { drainFtsQueue, hasPendingFtsWork, rebuildFtsIndex } from '../db/fts'
 import {
-  GRAPH_DEGREE_JOINS,
-  GRAPH_DEGREE_SELECT,
   GRAPH_EDGE_CANDIDATE_LIMIT,
   GRAPH_TAGS_QUERY,
+  graphCountQuery,
   graphEdgeQuery,
   graphIdList,
+  graphLocalCountQuery,
+  graphLocalNodesQuery,
+  graphNodesQuery,
 } from '../db/graph-sql'
 import { NOTE_COLUMNS, toNoteSummary, type NoteRow } from '../db/rows'
 import { ApiError } from '../lib/errors'
@@ -438,57 +440,28 @@ searchRoutes.get('/graph', requireAuth, async (c) => {
     in_degree: number
     out_degree: number
   }
-  // Degree counters live in db/graph-sql.ts: grouped scans joined onto the
-  // candidates instead of per-row correlated subqueries.
-  const degreeSelect = GRAPH_DEGREE_SELECT
-  const degreeJoins = GRAPH_DEGREE_JOINS
+  const where = filters.join(' AND ')
 
   let rows: GraphRow[]
   let totalNodes = 0
   if (mode === 'local') {
-    const neighborhood = `WITH RECURSIVE neighborhood(id, depth) AS (
-      SELECT ? AS id, 0 AS depth
-      UNION
-      SELECT CASE WHEN l.source_note_id = neighborhood.id THEN l.target_note_id ELSE l.source_note_id END,
-        neighborhood.depth + 1
-      FROM neighborhood
-      JOIN links l ON l.user_id = ? AND l.target_note_id IS NOT NULL
-        AND (l.source_note_id = neighborhood.id OR l.target_note_id = neighborhood.id)
-      JOIN notes adjacent ON adjacent.id = CASE
-        WHEN l.source_note_id = neighborhood.id THEN l.target_note_id ELSE l.source_note_id END
-        AND adjacent.user_id = l.user_id AND adjacent.deleted_at IS NULL AND adjacent.is_archived = 0
-      WHERE neighborhood.depth < ?
-    ), nearby AS (SELECT id, MIN(depth) AS depth FROM neighborhood GROUP BY id)`
     const prefixBinds = [centerId, userId, depth]
-    const result = await c.env.DB.prepare(
-      `${neighborhood}
-       SELECT n.id, n.title, n.folder_id, f.name AS folder_name, f.color AS folder_color,
-         ${degreeSelect}, nearby.depth
-       FROM nearby JOIN notes n ON n.id = nearby.id
-       LEFT JOIN folders f ON f.id = n.folder_id AND f.user_id = n.user_id
-       ${degreeJoins}
-       WHERE ${filters.join(' AND ')}
-       ORDER BY nearby.depth ASC, degree DESC, n.updated_at DESC, n.id ASC LIMIT ?`,
-    ).bind(...prefixBinds, userId, userId, userId, ...filterBinds, limit + 1).all<GraphRow>()
+    const result = await c.env.DB.prepare(graphLocalNodesQuery(where))
+      .bind(...prefixBinds, userId, userId, userId, ...filterBinds, limit + 1)
+      .all<GraphRow>()
     rows = result.results
-    const count = await c.env.DB.prepare(
-      `${neighborhood} SELECT COUNT(*) AS count FROM nearby JOIN notes n ON n.id = nearby.id
-       WHERE ${filters.join(' AND ')}`,
-    ).bind(...prefixBinds, ...filterBinds).first<{ count: number }>()
+    const count = await c.env.DB.prepare(graphLocalCountQuery(where))
+      .bind(...prefixBinds, ...filterBinds)
+      .first<{ count: number }>()
     totalNodes = Number(count?.count ?? rows.length)
   } else {
-    const result = await c.env.DB.prepare(
-      `SELECT n.id, n.title, n.folder_id, f.name AS folder_name, f.color AS folder_color,
-         ${degreeSelect}
-       FROM notes n LEFT JOIN folders f ON f.id = n.folder_id AND f.user_id = n.user_id
-       ${degreeJoins}
-       WHERE ${filters.join(' AND ')}
-       ORDER BY degree DESC, n.updated_at DESC, n.id ASC LIMIT ?`,
-    ).bind(userId, userId, userId, ...filterBinds, limit + 1).all<GraphRow>()
+    const result = await c.env.DB.prepare(graphNodesQuery(where))
+      .bind(userId, userId, userId, ...filterBinds, limit + 1)
+      .all<GraphRow>()
     rows = result.results
-    const count = await c.env.DB.prepare(
-      `SELECT COUNT(*) AS count FROM notes n WHERE ${filters.join(' AND ')}`,
-    ).bind(...filterBinds).first<{ count: number }>()
+    const count = await c.env.DB.prepare(graphCountQuery(where))
+      .bind(...filterBinds)
+      .first<{ count: number }>()
     totalNodes = Number(count?.count ?? rows.length)
   }
 

@@ -150,6 +150,9 @@ const allowed = new Map([
     "// used to expand the note id list into `IN (?,?,…)` placeholders, so any graph",
     "// of 50 notes or more (the API minimum) failed with",
     "// `D1_ERROR: too many SQL variables at offset 359`.",
+    "// The widest filter set the route can build: user, title, folder, tag and",
+    "// the orphan-excluding EXISTS (four bindings beyond the user id).",
+    "// A 5,000-note graph binds exactly as many parameters as a 1-note graph.",
   ]],
   ["src/worker/db/graph-sql.ts", [
     "/** SQL fragments for the relationship graph.\n *\n * D1 rejects any statement with more than 100 bound parameters, so nothing in\n * this module may scale its parameter count with the number of notes in the\n * graph. Note id lists travel as a single JSON array consumed by `json_each`,\n * and degrees come from grouped scans joined on the candidate rows instead of\n * per-row correlated subqueries.\n */",
@@ -158,7 +161,11 @@ const allowed = new Map([
     "/** Binds the user id, the note id array as JSON, and the row limit. */",
     "/** Binds the user id and the note id array as JSON. */",
     "/** Serializes the id list once so it can be bound as a single parameter. */",
-    "/** Highest bound-parameter count any graph statement can produce. Used by the\n * regression test that guards the D1 limit. */",
+    "/** Breadth-first neighbourhood of the centered note. Binds the center id, the\n * owning user id, and the search depth, in that order. */",
+    "/** Local-mode node query: binds the neighbourhood parameters, then the degree\n * joins, then the `where` clause parameters, then the row limit. */",
+    "/** Local-mode node count; binds the neighbourhood parameters and `where`. */",
+    "/** Global node query: binds the degree joins, `where`, then the row limit. */",
+    "/** Global node count; binds `where`. */",
   ]],
   ["src/worker/db/schema.ts", [
     "/** Defines the idempotent final D1 schema initialized by every Worker isolate. */",
@@ -263,8 +270,6 @@ const allowed = new Map([
     "// Kick off the first batch immediately; the rest is drained by the cron.",
   ]],
   ["src/worker/routes/search.ts", [
-    "// Degree counters live in db/graph-sql.ts: grouped scans joined onto the",
-    "// candidates instead of per-row correlated subqueries.",
     "// One JSON parameter carries the whole id list: expanding the ids into",
     "// placeholders needs `1 + 2n` bindings and every graph at or above the",
     "// 50-note minimum tripped D1's 100-parameter ceiling.",

@@ -48,6 +48,53 @@ export function graphIdList(ids: readonly string[]): string {
   return JSON.stringify(ids)
 }
 
-/** Highest bound-parameter count any graph statement can produce. Used by the
- * regression test that guards the D1 limit. */
-export const GRAPH_MAX_BOUND_PARAMETERS = 5
+/** Breadth-first neighbourhood of the centered note. Binds the center id, the
+ * owning user id, and the search depth, in that order. */
+export const GRAPH_LOCAL_NEIGHBORHOOD = `WITH RECURSIVE neighborhood(id, depth) AS (
+      SELECT ? AS id, 0 AS depth
+      UNION
+      SELECT CASE WHEN l.source_note_id = neighborhood.id THEN l.target_note_id ELSE l.source_note_id END,
+        neighborhood.depth + 1
+      FROM neighborhood
+      JOIN links l ON l.user_id = ? AND l.target_note_id IS NOT NULL
+        AND (l.source_note_id = neighborhood.id OR l.target_note_id = neighborhood.id)
+      JOIN notes adjacent ON adjacent.id = CASE
+        WHEN l.source_note_id = neighborhood.id THEN l.target_note_id ELSE l.source_note_id END
+        AND adjacent.user_id = l.user_id AND adjacent.deleted_at IS NULL AND adjacent.is_archived = 0
+      WHERE neighborhood.depth < ?
+    ), nearby AS (SELECT id, MIN(depth) AS depth FROM neighborhood GROUP BY id)`
+
+/** Local-mode node query: binds the neighbourhood parameters, then the degree
+ * joins, then the `where` clause parameters, then the row limit. */
+export function graphLocalNodesQuery(where: string): string {
+  return `${GRAPH_LOCAL_NEIGHBORHOOD}
+       SELECT n.id, n.title, n.folder_id, f.name AS folder_name, f.color AS folder_color,
+         ${GRAPH_DEGREE_SELECT}, nearby.depth
+       FROM nearby JOIN notes n ON n.id = nearby.id
+       LEFT JOIN folders f ON f.id = n.folder_id AND f.user_id = n.user_id
+       ${GRAPH_DEGREE_JOINS}
+       WHERE ${where}
+       ORDER BY nearby.depth ASC, degree DESC, n.updated_at DESC, n.id ASC LIMIT ?`
+}
+
+/** Local-mode node count; binds the neighbourhood parameters and `where`. */
+export function graphLocalCountQuery(where: string): string {
+  return `${GRAPH_LOCAL_NEIGHBORHOOD}
+       SELECT COUNT(*) AS count FROM nearby JOIN notes n ON n.id = nearby.id
+       WHERE ${where}`
+}
+
+/** Global node query: binds the degree joins, `where`, then the row limit. */
+export function graphNodesQuery(where: string): string {
+  return `SELECT n.id, n.title, n.folder_id, f.name AS folder_name, f.color AS folder_color,
+         ${GRAPH_DEGREE_SELECT}
+       FROM notes n LEFT JOIN folders f ON f.id = n.folder_id AND f.user_id = n.user_id
+       ${GRAPH_DEGREE_JOINS}
+       WHERE ${where}
+       ORDER BY degree DESC, n.updated_at DESC, n.id ASC LIMIT ?`
+}
+
+/** Global node count; binds `where`. */
+export function graphCountQuery(where: string): string {
+  return `SELECT COUNT(*) AS count FROM notes n WHERE ${where}`
+}
