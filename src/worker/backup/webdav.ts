@@ -166,9 +166,10 @@ export async function webdavDeliverArchive(
   const object = await webdavObjectMatches(base, auth, target, archive.byteLengthNumber, signal)
   if (object.matches) {
     await archive.stream.cancel().catch(() => {})
-    return { files: 1, bytes: archive.byteLengthNumber }
+    return { files: 1, bytes: archive.byteLengthNumber, path: target }
   }
 
+  console.log(`[inkstone] WebDAV upload starting: ${target} (${archive.byteLengthNumber} bytes)`)
   const fixed = new FixedLengthStream(archive.byteLength)
   const pump = archive.stream.pipeTo(fixed.writable, { signal })
   const upload = webdavFetch(object.url, {
@@ -192,7 +193,7 @@ export async function webdavDeliverArchive(
     throw new Error(`Upload ${archive.filename} failed: HTTP ${response.status}`)
   }
 
-  return { files: 1, bytes: archive.byteLengthNumber }
+  return { files: 1, bytes: archive.byteLengthNumber, path: target }
 }
 
 async function webdavObjectMatches(

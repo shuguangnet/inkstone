@@ -5,6 +5,14 @@ import { sliceText, truncateText } from '@shared/text-utils'
 import type { GraphResponse, SearchHit, SearchResponse } from '@shared/types'
 import type { AppBindings } from '../env'
 import { drainFtsQueue, hasPendingFtsWork, rebuildFtsIndex } from '../db/fts'
+import {
+  GRAPH_DEGREE_JOINS,
+  GRAPH_DEGREE_SELECT,
+  GRAPH_EDGE_CANDIDATE_LIMIT,
+  GRAPH_TAGS_QUERY,
+  graphEdgeQuery,
+  graphIdList,
+} from '../db/graph-sql'
 import { NOTE_COLUMNS, toNoteSummary, type NoteRow } from '../db/rows'
 import { ApiError } from '../lib/errors'
 import { isValidId } from '../lib/id'
@@ -15,8 +23,6 @@ import { consumeAttemptBudget, ThrottleError } from '../lib/throttle'
 import { requireAuth } from '../middleware/auth'
 
 export const searchRoutes = new Hono<AppBindings>()
-
-const GRAPH_EDGE_CANDIDATE_LIMIT = 10_000
 
 
 export interface ParsedQuery {
@@ -432,12 +438,10 @@ searchRoutes.get('/graph', requireAuth, async (c) => {
     in_degree: number
     out_degree: number
   }
-  const degreeSelect = `
-    (SELECT COUNT(*) FROM links ld WHERE ld.user_id = ? AND ld.target_note_id IS NOT NULL
-      AND (ld.source_note_id = n.id OR ld.target_note_id = n.id)) AS degree,
-    (SELECT COUNT(*) FROM links li WHERE li.user_id = ? AND li.target_note_id = n.id) AS in_degree,
-    (SELECT COUNT(*) FROM links lo WHERE lo.user_id = ? AND lo.source_note_id = n.id
-      AND lo.target_note_id IS NOT NULL) AS out_degree`
+  // Degree counters live in db/graph-sql.ts: grouped scans joined onto the
+  // candidates instead of per-row correlated subqueries.
+  const degreeSelect = GRAPH_DEGREE_SELECT
+  const degreeJoins = GRAPH_DEGREE_JOINS
 
   let rows: GraphRow[]
   let totalNodes = 0
@@ -462,6 +466,7 @@ searchRoutes.get('/graph', requireAuth, async (c) => {
          ${degreeSelect}, nearby.depth
        FROM nearby JOIN notes n ON n.id = nearby.id
        LEFT JOIN folders f ON f.id = n.folder_id AND f.user_id = n.user_id
+       ${degreeJoins}
        WHERE ${filters.join(' AND ')}
        ORDER BY nearby.depth ASC, degree DESC, n.updated_at DESC, n.id ASC LIMIT ?`,
     ).bind(...prefixBinds, userId, userId, userId, ...filterBinds, limit + 1).all<GraphRow>()
@@ -476,6 +481,7 @@ searchRoutes.get('/graph', requireAuth, async (c) => {
       `SELECT n.id, n.title, n.folder_id, f.name AS folder_name, f.color AS folder_color,
          ${degreeSelect}
        FROM notes n LEFT JOIN folders f ON f.id = n.folder_id AND f.user_id = n.user_id
+       ${degreeJoins}
        WHERE ${filters.join(' AND ')}
        ORDER BY degree DESC, n.updated_at DESC, n.id ASC LIMIT ?`,
     ).bind(userId, userId, userId, ...filterBinds, limit + 1).all<GraphRow>()
@@ -495,24 +501,22 @@ searchRoutes.get('/graph', requireAuth, async (c) => {
   const unresolved = new Map<string, { title: string; sources: Set<string> }>()
   const tagsByNote = new Map<string, Array<{ name: string; color: string | null }>>()
   if (ids.length) {
-    const placeholders = ids.map(() => '?').join(',')
+    // One JSON parameter carries the whole id list: expanding the ids into
+    // placeholders needs `1 + 2n` bindings and every graph at or above the
+    // 50-note minimum tripped D1's 100-parameter ceiling.
+    const idList = graphIdList(ids)
     const [linkResult, tagResult] = await Promise.all([
-      c.env.DB.prepare(
-        `SELECT source_note_id, target_note_id, target_key, target_title FROM links
-         WHERE user_id = ? AND source_note_id IN (${placeholders})
-           AND (target_note_id IN (${placeholders})${includeUnresolved ? ' OR target_note_id IS NULL' : ''})
-         ORDER BY source_note_id ASC, target_key ASC LIMIT ?`,
-      ).bind(userId, ...ids, ...ids, GRAPH_EDGE_CANDIDATE_LIMIT + 1).all<{
-        source_note_id: string
-        target_note_id: string | null
-        target_key: string
-        target_title: string
-      }>(),
-      c.env.DB.prepare(
-        `SELECT nt.note_id, t.name, t.color FROM note_tags nt
-         JOIN tags t ON t.id = nt.tag_id AND t.user_id = ?
-         WHERE nt.note_id IN (${placeholders}) ORDER BY t.name COLLATE NOCASE ASC`,
-      ).bind(userId, ...ids).all<{ note_id: string; name: string; color: string | null }>(),
+      c.env.DB.prepare(graphEdgeQuery(includeUnresolved))
+        .bind(userId, idList, GRAPH_EDGE_CANDIDATE_LIMIT + 1)
+        .all<{
+          source_note_id: string
+          target_note_id: string | null
+          target_key: string
+          target_title: string
+        }>(),
+      c.env.DB.prepare(GRAPH_TAGS_QUERY)
+        .bind(userId, idList)
+        .all<{ note_id: string; name: string; color: string | null }>(),
     ])
     if (linkResult.results.length > GRAPH_EDGE_CANDIDATE_LIMIT) truncated = true
     const seen = new Set<string>()

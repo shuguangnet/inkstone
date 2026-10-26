@@ -86,7 +86,7 @@ export async function s3DeliverArchive(
   const key = joinKey(prefix, `backups/${archive.filename}`)
   if (await s3ArchiveMatches(aws, config, key, archive.byteLengthNumber, stamp, signal)) {
     await archive.stream.cancel().catch(() => {})
-    return { files: 1, bytes: archive.byteLengthNumber }
+    return { files: 1, bytes: archive.byteLengthNumber, path: key }
   }
 
   if (archive.byteLengthNumber <= S3_MULTIPART_PART_BYTES) {
@@ -104,7 +104,7 @@ export async function s3DeliverArchive(
     )
   }
 
-  return { files: 1, bytes: archive.byteLengthNumber }
+  return { files: 1, bytes: archive.byteLengthNumber, path: key }
 }
 
 async function s3ArchiveMatches(

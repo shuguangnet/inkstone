@@ -3,6 +3,10 @@ import { APP_VERSION } from '@shared/constants'
 export interface DeliverResult {
   files: number
   bytes: number
+  // Where the archive landed, relative to the target root (or the object key
+  // for S3). Surfaced in the run history so a finished backup can be found on
+  // the remote server without guessing the prefix and subfolder layout.
+  path?: string | null
 }
 
 

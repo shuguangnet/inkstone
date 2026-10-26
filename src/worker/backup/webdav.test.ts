@@ -108,7 +108,7 @@ describe('canonical DAV operations', () => {
     });
     vi.stubGlobal('fetch', fetcher);
     const result = await webdavDeliverArchive(config, secret, { filename: 'test.zip', byteLength: BigInt(payload.length), byteLengthNumber: payload.length, stream: new ReadableStream({ start(controller) { controller.enqueue(payload); controller.close(); } }) });
-    expect(result).toEqual({ files: 1, bytes: payload.length });
+    expect(result).toEqual({ files: 1, bytes: payload.length, path: 'inkstone/backups/test.zip' });
     expect(uploaded).toEqual(['https://ewebdav.pcloud.com/final/resolved.zip']);
     expect(fetcher.mock.calls.slice(1).every(([url]) => String(url).startsWith('https://ewebdav.pcloud.com/'))).toBe(true);
   });

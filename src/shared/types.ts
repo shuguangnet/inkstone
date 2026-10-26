@@ -445,6 +445,8 @@ export interface BackupTargetResult {
   ok: boolean
   files: number
   bytes: number
+  /** Remote location of the archive, e.g. `siyuan-backup/backups/<file>.zip`. */
+  path?: string | null
   ms: number
   error: string | null
 }

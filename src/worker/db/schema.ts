@@ -566,6 +566,15 @@ const SCHEMA_MIGRATIONS: readonly SchemaMigration[] = [
        )`,
     ],
   },
+  {
+    // Graph edges and degree counts filter `links` by outbound note; without
+    // this index every graph request scanned the user's whole link table.
+    version: 13,
+    statements: [
+      `CREATE INDEX IF NOT EXISTS idx_links_source_note
+         ON links(user_id, source_note_id)`,
+    ],
+  },
 ]
 
 const FTS_STATEMENT = `CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
@@ -662,6 +671,7 @@ const REQUIRED_INDEXES = [
   'idx_note_tags_tag',
   'idx_links_target',
   'idx_links_target_note',
+  'idx_links_source_note',
   'idx_versions_note',
   'idx_attachments_user',
   'idx_attachments_user_sha',

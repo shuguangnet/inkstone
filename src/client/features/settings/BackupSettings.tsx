@@ -604,13 +604,16 @@ function RunRow({ run }: {
       </button>
 
       {open && run.results.length > 0 && (<ul className="border-t border-[var(--border-subtle)] bg-[var(--bg-inset)] px-3 py-2">
-          {run.results.map((result, index) => (<li key={`${result.targetId}-${index}`} className="flex items-start gap-2 py-1 text-[11.5px]">
-              {result.ok ? (<CheckCircle2 size={11} className="mt-0.5 shrink-0 text-[var(--success)]"/>) : (<AlertCircle size={11} className="mt-0.5 shrink-0 text-[var(--danger)]"/>)}
-              <span className="shrink-0 text-[var(--text-secondary)]">{result.targetName}</span>
-              <span className="min-w-0 flex-1 text-[var(--text-quaternary)]">
-                {result.ok
-                    ? t("settings.value0_files_value1_value2", { value0: result.files, value1: formatBytes(result.bytes), value2: formatDuration(result.ms) }) : translateServiceMessage(result.error)}
-              </span>
+          {run.results.map((result, index) => (<li key={`${result.targetId}-${index}`} className="py-1 text-[11.5px]">
+              <div className="flex items-start gap-2">
+                {result.ok ? (<CheckCircle2 size={11} className="mt-0.5 shrink-0 text-[var(--success)]"/>) : (<AlertCircle size={11} className="mt-0.5 shrink-0 text-[var(--danger)]"/>)}
+                <span className="shrink-0 text-[var(--text-secondary)]">{result.targetName}</span>
+                <span className="min-w-0 flex-1 text-[var(--text-quaternary)]">
+                  {result.ok
+                      ? t("settings.value0_files_value1_value2", { value0: result.files, value1: formatBytes(result.bytes), value2: formatDuration(result.ms) }) : translateServiceMessage(result.error)}
+                </span>
+              </div>
+              {result.ok && result.path && (<code className="mt-0.5 ml-[19px] block select-text break-all text-[11px] text-[var(--text-quaternary)]">{result.path}</code>)}
             </li>))}
         </ul>)}
     </li>);

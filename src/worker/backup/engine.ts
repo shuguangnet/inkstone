@@ -124,7 +124,12 @@ async function runBackupUnlocked(
 
   let snapshot: Snapshot
   try {
+    const snapshotStarted = Date.now()
     snapshot = await buildSnapshot(env, userId)
+    console.log(
+      `[inkstone] Backup snapshot ready in ${Date.now() - snapshotStarted}ms`,
+      `notes=${snapshot.noteCount} files=${snapshot.payloadFiles.length} bytes=${snapshot.bytes}`,
+    )
   } catch (error) {
     const message = friendlyError(error)
     const results: BackupTargetResult[] = targets.map((target) => ({
@@ -134,6 +139,7 @@ async function runBackupUnlocked(
       ok: false,
       files: 0,
       bytes: 0,
+      path: null,
       ms: Date.now() - startedAt,
       error: truncateText(message, 1000),
     }))
@@ -180,7 +186,7 @@ async function deliverToTarget(
   snapshot: Snapshot,
 ): Promise<BackupTargetResult> {
   const started = Date.now()
-  const base: Omit<BackupTargetResult, 'ok' | 'files' | 'bytes' | 'ms' | 'error'> = {
+  const base: Omit<BackupTargetResult, 'ok' | 'files' | 'bytes' | 'path' | 'ms' | 'error'> = {
     targetId: target.id,
     targetName: target.name,
     targetType: target.type,
@@ -217,7 +223,19 @@ async function deliverToTarget(
             : await webdavDeliver(config, secret, snapshot, controller.signal)
         }
         const outcome = await deliver()
-        return { ...base, ok: true, files: outcome.files, bytes: outcome.bytes, ms: Date.now() - started, error: null }
+        console.log(
+          `[inkstone] Backup delivered to ${target.name} in ${Date.now() - started}ms`,
+          `files=${outcome.files} bytes=${outcome.bytes} path=${outcome.path ?? ''}`,
+        )
+        return {
+          ...base,
+          ok: true,
+          files: outcome.files,
+          bytes: outcome.bytes,
+          path: outcome.path ?? null,
+          ms: Date.now() - started,
+          error: null,
+        }
       } catch (error) {
         if (attempt > 0 || !isTransientBackupError(error)) throw error
       } finally {
@@ -231,6 +249,7 @@ async function deliverToTarget(
       ok: false,
       files: 0,
       bytes: 0,
+      path: null,
       ms: Date.now() - started,
       error: truncateText(friendlyError(err), 1000),
     }

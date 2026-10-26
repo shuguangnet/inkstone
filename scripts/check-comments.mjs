@@ -104,6 +104,7 @@ const allowed = new Map([
   ]],
   ["src/shared/types.ts", [
     "/** Free-form instructions appended to every AI assistant system prompt. */",
+    "/** Remote location of the archive, e.g. `siyuan-backup/backups/<file>.zip`. */",
     "/** Title → slug mapping of every published post in the collection, used\n   * to resolve WikiLinks between public notes. */",
     "/** Present when the note belongs to a published blog collection. */",
   ]],
@@ -133,11 +134,31 @@ const allowed = new Map([
   ["src/worker/backup/archive.ts", [
     "/** Builds a ZIP from an arbitrary file list — used by the Obsidian/Notion\n * portable vault exports, which intentionally omit Inkstone control files. */",
   ]],
+  ["src/worker/backup/common.ts", [
+    "// Where the archive landed, relative to the target root (or the object key",
+    "// for S3). Surfaced in the run history so a finished backup can be found on",
+    "// the remote server without guessing the prefix and subfolder layout.",
+  ]],
   ["src/worker/backup/restore.ts", [
     "/** Pulls a backup archive back from a WebDAV or S3 target — the read half\n * of bidirectional sync. Restores then flow through the standard import\n * path, so conflict rules and version-safe writes are unchanged. */",
   ]],
   ["src/worker/backup/snapshot.ts", [
     "/** Produces restorable JSON, readable Markdown, and attachment files for every backup target. */",
+  ]],
+  ["src/worker/db/graph-sql.test.ts", [
+    "// D1 rejects any statement with more than 100 bound parameters. Graph queries",
+    "// used to expand the note id list into `IN (?,?,…)` placeholders, so any graph",
+    "// of 50 notes or more (the API minimum) failed with",
+    "// `D1_ERROR: too many SQL variables at offset 359`.",
+  ]],
+  ["src/worker/db/graph-sql.ts", [
+    "/** SQL fragments for the relationship graph.\n *\n * D1 rejects any statement with more than 100 bound parameters, so nothing in\n * this module may scale its parameter count with the number of notes in the\n * graph. Note id lists travel as a single JSON array consumed by `json_each`,\n * and degrees come from grouped scans joined on the candidate rows instead of\n * per-row correlated subqueries.\n */",
+    "/** Degree columns for a note aliased as `n`. Requires {@link GRAPH_DEGREE_JOINS}. */",
+    "/** Binds the owning user id three times, in this order. */",
+    "/** Binds the user id, the note id array as JSON, and the row limit. */",
+    "/** Binds the user id and the note id array as JSON. */",
+    "/** Serializes the id list once so it can be bound as a single parameter. */",
+    "/** Highest bound-parameter count any graph statement can produce. Used by the\n * regression test that guards the D1 limit. */",
   ]],
   ["src/worker/db/schema.ts", [
     "/** Defines the idempotent final D1 schema initialized by every Worker isolate. */",
@@ -147,6 +168,8 @@ const allowed = new Map([
     "// ALTER TABLE ADD COLUMN with constraints, so the AI search preference",
     "// lives in app_meta (key `ai-search-enabled:<userId>`) instead of a",
     "// new column on the pre-existing mcp_preferences table.",
+    "// Graph edges and degree counts filter `links` by outbound note; without",
+    "// this index every graph request scanned the user's whole link table.",
     "// Existing installations must converge additively. CREATE IF NOT EXISTS",
     "// never rewrites user data; running table creation before indexes also",
     "// lets a partially initialized database recover missing feature tables.",
@@ -238,6 +261,13 @@ const allowed = new Map([
   ]],
   ["src/worker/routes/mcp-settings.ts", [
     "// Kick off the first batch immediately; the rest is drained by the cron.",
+  ]],
+  ["src/worker/routes/search.ts", [
+    "// Degree counters live in db/graph-sql.ts: grouped scans joined onto the",
+    "// candidates instead of per-row correlated subqueries.",
+    "// One JSON parameter carries the whole id list: expanding the ids into",
+    "// placeholders needs `1 + 2n` bindings and every graph at or above the",
+    "// 50-note minimum tripped D1's 100-parameter ceiling.",
   ]],
   ["src/worker/routes/share.ts", [
     "/** Public blog index JSON backing the /s/blog/:slug front page. */",
