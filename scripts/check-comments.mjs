@@ -95,6 +95,7 @@ const allowed = new Map([
   ]],
   ["src/shared/markdown-utils.ts", [
     "/** Provides pure Markdown analysis shared by the browser and Worker runtimes. */",
+    "/** Rewrites the note part of a wiki-link target so it keeps addressing the same\n * folder path while the trailing segment follows a rename. Returns null when the\n * target does not address `fromTitle`. */",
   ]],
   ["src/shared/templates.ts", [
     "/** Note templates: built-ins shipped with the app plus per-user saved\n * templates persisted client-side (localStorage, per account). */",
@@ -153,6 +154,8 @@ const allowed = new Map([
     "// The widest filter set the route can build: user, title, folder, tag and",
     "// the orphan-excluding EXISTS (four bindings beyond the user id).",
     "// A 5,000-note graph binds exactly as many parameters as a 1-note graph.",
+    "// `?2` appears twice in the edge query, so the textual count is 4 while the",
+    "// statement binds three values.",
   ]],
   ["src/worker/db/graph-sql.ts", [
     "/** SQL fragments for the relationship graph.\n *\n * D1 rejects any statement with more than 100 bound parameters, so nothing in\n * this module may scale its parameter count with the number of notes in the\n * graph. Note id lists travel as a single JSON array consumed by `json_each`,\n * and degrees come from grouped scans joined on the candidate rows instead of\n * per-row correlated subqueries.\n */",
@@ -167,6 +170,9 @@ const allowed = new Map([
     "/** Global node query: binds the degree joins, `where`, then the row limit. */",
     "/** Global node count; binds `where`. */",
   ]],
+  ["src/worker/db/links.test.ts", [
+    "/** Collapses the whitespace differences between the runtime fragment and its\n * frozen migration copy so they can be compared structurally. */",
+  ]],
   ["src/worker/db/schema.ts", [
     "/** Defines the idempotent final D1 schema initialized by every Worker isolate. */",
     "// Explicit whitelist (not a regex over SCHEMA_STATEMENTS) so later",
@@ -177,12 +183,17 @@ const allowed = new Map([
     "// new column on the pre-existing mcp_preferences table.",
     "// Graph edges and degree counts filter `links` by outbound note; without",
     "// this index every graph request scanned the user's whole link table.",
+    "// Links were resolved only when their source note was saved, so a target",
+    "// created later (or addressed as `folder/Note`) stayed unresolved forever.",
+    "// Frozen copy of `LINK_TARGET_SUBQUERY` from db/writes.ts.",
     "// Existing installations must converge additively. CREATE IF NOT EXISTS",
     "// never rewrites user data; running table creation before indexes also",
     "// lets a partially initialized database recover missing feature tables.",
   ]],
   ["src/worker/db/writes.ts", [
     "/** Keeps tags, backlinks, full-text indexes, and change records consistent with note writes. */",
+    "/** SQL fragment yielding the trailing segment of a normalized link key, so\n * `[[01-net/frp]]` can resolve to the note titled `frp`. Mirrors Obsidian's\n * shortest-path links; for keys without a slash it returns the whole key. */",
+    "/** Resolves a wiki link to a note, preferring an exact title over a trailing\n * segment match. The inner SELECT exists because SQLite will not resolve\n * `links.target_key` from the ORDER BY of a statement-updating subquery. */",
   ]],
   ["src/worker/env.ts", [
     "/** Workers AI binding for semantic search; optional so AI search degrades gracefully. */",

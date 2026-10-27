@@ -367,7 +367,7 @@ interface SchemaMigration {
   skipIfColumnExists?: { table: string; column: string }
 }
 
-const SCHEMA_MIGRATIONS: readonly SchemaMigration[] = [
+export const SCHEMA_MIGRATIONS: readonly SchemaMigration[] = [
   {
     // Explicit whitelist (not a regex over SCHEMA_STATEMENTS) so later
     // additions like mcp_api_keys can never be picked up accidentally.
@@ -573,6 +573,26 @@ const SCHEMA_MIGRATIONS: readonly SchemaMigration[] = [
     statements: [
       `CREATE INDEX IF NOT EXISTS idx_links_source_note
          ON links(user_id, source_note_id)`,
+    ],
+  },
+  {
+    // Links were resolved only when their source note was saved, so a target
+    // created later (or addressed as `folder/Note`) stayed unresolved forever.
+    // Frozen copy of `LINK_TARGET_SUBQUERY` from db/writes.ts.
+    version: 14,
+    statements: [
+      `UPDATE links SET target_note_id = (SELECT best.id FROM (
+          SELECT candidate.id AS id,
+                 candidate.created_at AS created_at,
+                 CASE WHEN candidate.title_key = links.target_key THEN 0 ELSE 1 END AS rank
+            FROM notes candidate
+           WHERE candidate.user_id = links.user_id AND candidate.deleted_at IS NULL
+             AND (candidate.title_key = links.target_key
+               OR (instr(links.target_key, '/') > 0 AND candidate.title_key = trim(substr(
+                    links.target_key,
+                    length(rtrim(links.target_key, replace(links.target_key, '/', ''))) + 1))))
+        ) best ORDER BY best.rank ASC, best.created_at ASC, best.id ASC LIMIT 1)
+        WHERE target_note_id IS NULL`,
     ],
   },
 ]

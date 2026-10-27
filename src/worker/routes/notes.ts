@@ -1,6 +1,13 @@
 import { Hono } from 'hono'
 import { LIMITS } from '@shared/constants'
-import { countText, deriveExcerpt, extractTags, normalizeLinkKey, replaceWikiLinkTarget } from '@shared/markdown-utils'
+import {
+  countText,
+  deriveExcerpt,
+  extractTags,
+  normalizeLinkKey,
+  replaceWikiLinkTarget,
+  retargetWikiLinkTarget,
+} from '@shared/markdown-utils'
 import { duplicateNoteTitle, sliceText, truncateText, utf8ByteLength } from '@shared/text-utils'
 import type {
   CreateNoteBody,
@@ -17,6 +24,7 @@ import {
   buildNoteDerivedStatements,
   changeStatement,
   FTS_QUEUE_CONFLICT_SQL,
+  LINK_BASENAME_SQL,
   LINK_TARGET_SUBQUERY,
   pruneOrphanTags,
 } from '../db/writes'
@@ -1006,20 +1014,31 @@ async function rewriteInboundWikiLinks(
 ): Promise<{ rewritten: number; skipped: number }> {
   const previousKey = normalizeLinkKey(fromTitle)
   const { results: candidates } = await db.prepare(
-    `SELECT DISTINCT n.id FROM links l
-      JOIN notes n ON n.id = l.source_note_id AND n.user_id = l.user_id
-     WHERE l.user_id = ?1 AND l.target_note_id = ?2 AND l.target_key = ?3
-       AND n.id <> ?2 AND n.deleted_at IS NULL`,
-  ).bind(userId, targetNoteId, previousKey).all<{ id: string }>()
+    `SELECT DISTINCT links.source_note_id AS id, links.target_title AS targetTitle
+       FROM links JOIN notes n ON n.id = links.source_note_id AND n.user_id = links.user_id
+      WHERE links.user_id = ?1 AND links.target_note_id = ?2
+        AND (links.target_key = ?3
+          OR (instr(links.target_key, '/') > 0 AND ${LINK_BASENAME_SQL} = ?3))
+        AND n.id <> ?2 AND n.deleted_at IS NULL`,
+  ).bind(userId, targetNoteId, previousKey).all<{ id: string; targetTitle: string }>()
+
+  const retarget = (targetTitle: string) => retargetWikiLinkTarget(targetTitle, fromTitle, toTitle)
+  const targetsByNote = new Map<string, string[]>()
+  for (const row of candidates) {
+    if (retarget(row.targetTitle) === null) continue
+    const list = targetsByNote.get(row.id) ?? []
+    if (!list.includes(row.targetTitle)) list.push(row.targetTitle)
+    targetsByNote.set(row.id, list)
+  }
   let rewritten = 0
   let skipped = 0
-  for (const candidate of candidates) {
+  for (const [sourceNoteId, targetTitles] of targetsByNote) {
     let complete = false
     for (let attempt = 0; attempt < 5; attempt++) {
       const note = await db.prepare(
         `SELECT id, title, content, content_hash, rev, updated_at, deleted_at
            FROM notes WHERE id = ?1 AND user_id = ?2`,
-      ).bind(candidate.id, userId).first<{
+      ).bind(sourceNoteId, userId).first<{
         id: string
         title: string
         content: string
@@ -1032,7 +1051,11 @@ async function rewriteInboundWikiLinks(
         complete = true
         break
       }
-      const content = replaceWikiLinkTarget(note.content, fromTitle, toTitle)
+      let content = note.content
+      for (const targetTitle of targetTitles) {
+        const to = retarget(targetTitle)
+        if (to !== null) content = replaceWikiLinkTarget(content, targetTitle, to)
+      }
       if (content === note.content) {
         complete = true
         break

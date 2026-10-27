@@ -14,10 +14,25 @@ export const FTS_QUEUE_CONFLICT_SQL = `ON CONFLICT(user_id, note_id) DO UPDATE S
   END`
 
 
-export const LINK_TARGET_SUBQUERY = `(SELECT candidate.id FROM notes candidate
-  WHERE candidate.user_id = links.user_id AND candidate.deleted_at IS NULL
-    AND candidate.title_key = links.target_key
-  ORDER BY candidate.created_at ASC, candidate.id ASC LIMIT 1)`
+/** SQL fragment yielding the trailing segment of a normalized link key, so
+ * `[[01-net/frp]]` can resolve to the note titled `frp`. Mirrors Obsidian's
+ * shortest-path links; for keys without a slash it returns the whole key. */
+export const LINK_BASENAME_SQL = `trim(substr(
+  links.target_key,
+  length(rtrim(links.target_key, replace(links.target_key, '/', ''))) + 1))`
+
+/** Resolves a wiki link to a note, preferring an exact title over a trailing
+ * segment match. The inner SELECT exists because SQLite will not resolve
+ * `links.target_key` from the ORDER BY of a statement-updating subquery. */
+export const LINK_TARGET_SUBQUERY = `(SELECT best.id FROM (
+    SELECT candidate.id AS id,
+           candidate.created_at AS created_at,
+           CASE WHEN candidate.title_key = links.target_key THEN 0 ELSE 1 END AS rank
+      FROM notes candidate
+     WHERE candidate.user_id = links.user_id AND candidate.deleted_at IS NULL
+       AND (candidate.title_key = links.target_key
+         OR (instr(links.target_key, '/') > 0 AND candidate.title_key = ${LINK_BASENAME_SQL}))
+  ) best ORDER BY best.rank ASC, best.created_at ASC, best.id ASC LIMIT 1)`
 
 export function changeStatement(
   db: D1Database,
@@ -88,6 +103,7 @@ export function buildNoteDerivedStatements(
   const links = extractWikiLinks(content)
   const tagRows = JSON.stringify(tagNames.map((name) => ({ id: newId(), name })))
   const linkRows = JSON.stringify(links.map((link) => ({ key: link.key, target: link.target })))
+  const titleKey = normalizeLinkKey(title)
   const statements: D1PreparedStatement[] = []
   const guarded = opts.expectedRev !== undefined ||
     opts.expectedContentHash !== undefined ||
@@ -212,8 +228,19 @@ export function buildNoteDerivedStatements(
     )
   }
 
+  statements.push(
+    db
+      .prepare(
+        `UPDATE links SET target_note_id = ?1
+          WHERE user_id = ?2 AND target_note_id IS NULL
+            AND (target_key = ?3 OR (instr(target_key, '/') > 0 AND ${LINK_BASENAME_SQL} = ?3))
+            AND ${shiftPlaceholders(guard, 3)}`,
+      )
+      .bind(noteId, userId, titleKey, ...guardValues),
+  )
+
   if (opts.titleChanged === true) {
-    const currentKey = normalizeLinkKey(title)
+    const currentKey = titleKey
     const previousKey = normalizeLinkKey(opts.previousTitle ?? title)
     statements.push(
       db

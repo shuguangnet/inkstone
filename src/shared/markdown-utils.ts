@@ -553,6 +553,24 @@ function replaceWikiLinkTargetLine(content: string, from: string, to: string): s
   )
 }
 
+/** Rewrites the note part of a wiki-link target so it keeps addressing the same
+ * folder path while the trailing segment follows a rename. Returns null when the
+ * target does not address `fromTitle`. */
+export function retargetWikiLinkTarget(
+  target: string,
+  fromTitle: string,
+  toTitle: string,
+): string | null {
+  const note = wikiNoteTarget(target)
+  if (!note) return null
+  const fromKey = normalizeLinkKey(fromTitle)
+  const slash = note.lastIndexOf('/')
+  const base = slash >= 0 ? note.slice(slash + 1) : note
+  if (normalizeLinkKey(base) !== fromKey) return null
+  const rewritten = slash >= 0 ? `${note.slice(0, slash + 1)}${toTitle}` : toTitle
+  return rewritten === note ? null : rewritten
+}
+
 export function replaceWikiLinkTarget(content: string, from: string, to: string): string {
   const frontMatter = parseFrontMatter(content)
   const lines = content.split('\n')
